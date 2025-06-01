@@ -10,7 +10,7 @@ A Model Context Protocol (MCP) server for integrating with Mention's brand monit
 
 ### Build from Source
 ```bash
-git clone <repository-url>
+git clone https://github.com/MaelitoP/mention-mcp-server.git
 cd mention-mcp-server
 go mod tidy
 go install
