@@ -1,0 +1,62 @@
+import { zodToJsonSchema } from "zod-to-json-schema";
+import type { MentionAPIClient } from "../api-client.js";
+import { logError, logInfo } from "../logger.js";
+import { CreateAdvancedAlertArgsSchema } from "../types.js";
+import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
+
+function createAdvancedAlertHandler(apiClient: MentionAPIClient): ToolHandler {
+  return {
+    async handle(args: unknown): Promise<{
+      content: Array<{
+        type: string;
+        text: string;
+      }>;
+    }> {
+      try {
+        const validated = CreateAdvancedAlertArgsSchema.parse(args);
+        const accountId = await apiClient.getAccountId();
+
+        const { query_string, ...requestData } = validated;
+
+        const requestBody = {
+          ...requestData,
+          query: {
+            type: "advanced",
+            query_string,
+          },
+        };
+
+        const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts`, {
+          method: "POST",
+          body: JSON.stringify(requestBody),
+        });
+
+        logInfo("Advanced alert created", { accountId, alertName: validated.name });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(data, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        logError("Failed to create advanced alert", error);
+        throw error;
+      }
+    },
+  };
+}
+
+export const createAdvancedAlertTool: Tool = {
+  getDefinition(): ToolDefinition {
+    return {
+      name: "create_advanced_alert",
+      description:
+        "Create a new advanced monitoring alert with boolean query syntax. Advanced alerts use complex query strings with boolean operators like AND, OR, NOT.",
+      inputSchema: zodToJsonSchema(CreateAdvancedAlertArgsSchema),
+    };
+  },
+  createHandler: createAdvancedAlertHandler,
+};
