@@ -1,5 +1,5 @@
 {
-  "name": "@MaelitoP/mention-mcp-server",
+  "name": "@maelitop/mention-mcp-server",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",

@@ -28,7 +28,7 @@ Add the following to your Claude Desktop configuration file:
   "mcpServers": {
     "mention": {
       "command": "npx",
-      "args": ["-y", "@MaelitoP/mention-mcp-server"],
+      "args": ["-y", "@maelitop/mention-mcp-server"],
       "env": {
         "MENTION_API_KEY": "your_mention_api_key_here"
       }
