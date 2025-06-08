@@ -1,15 +1,30 @@
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+node_modules/
 
-*.test
-
-go.work
-go.work.sum
+dist/
 
 .env
+.env.local
+.env.*.local
 
-.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+.claude/
+
+*.tsbuildinfo
