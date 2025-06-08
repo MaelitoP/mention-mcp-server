@@ -1,10 +1,12 @@
 package utils
 
 import (
-	"fmt"
-	"log"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"mention-mcp-server/config"
 )
 
 type Logger interface {
@@ -14,65 +16,80 @@ type Logger interface {
 	Warn(msg string, args ...interface{})
 }
 
-type SimpleLogger struct {
-	infoLogger  *log.Logger
-	errorLogger *log.Logger
-	debugLogger *log.Logger
-	warnLogger  *log.Logger
-	debug       bool
-	logFile     *os.File
+type LogrusLogger struct {
+	logger  *logrus.Logger
+	debug   bool
+	logFile *os.File
 }
 
 func NewLogger(debug bool) Logger {
 	homeDir, _ := os.UserHomeDir()
-	logDir := fmt.Sprintf("%s/.config/mention-mcp/logs", homeDir)
+	logDir := filepath.Join(homeDir, config.DefaultConfigDir, config.LogsSubDir)
 	os.MkdirAll(logDir, 0755)
 
-	logFileName := fmt.Sprintf("%s/mcp-debug-%s.log", logDir, time.Now().Format("2006-01-02"))
-	logFile, _ := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFileName := filepath.Join(logDir, "mcp-"+time.Now().Format(config.LogDateFormat)+".json")
+	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 
-	return &SimpleLogger{
-		infoLogger:  log.New(logFile, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile),
-		errorLogger: log.New(logFile, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
-		debugLogger: log.New(logFile, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
-		warnLogger:  log.New(logFile, "WARN: ", log.Ldate|log.Ltime|log.Lshortfile),
-		debug:       debug,
-		logFile:     logFile,
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339,
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyTime:  "timestamp",
+			logrus.FieldKeyLevel: "level",
+			logrus.FieldKeyMsg:   "message",
+			logrus.FieldKeyFunc:  "function",
+			logrus.FieldKeyFile:  "file",
+		},
+	})
+
+	if err != nil {
+		logger.SetOutput(os.Stderr)
+	} else {
+		logger.SetOutput(logFile)
+	}
+
+	if debug {
+		logger.SetLevel(logrus.DebugLevel)
+	} else {
+		logger.SetLevel(logrus.InfoLevel)
+	}
+
+	return &LogrusLogger{
+		logger:  logger,
+		debug:   debug,
+		logFile: logFile,
 	}
 }
 
-func (l *SimpleLogger) Info(msg string, args ...interface{}) {
+func (l *LogrusLogger) Info(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		l.infoLogger.Printf(msg, args...)
+		l.logger.Infof(msg, args...)
 	} else {
-		l.infoLogger.Print(msg)
+		l.logger.Info(msg)
 	}
 }
 
-func (l *SimpleLogger) Error(msg string, args ...interface{}) {
+func (l *LogrusLogger) Error(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		l.errorLogger.Printf(msg, args...)
+		l.logger.Errorf(msg, args...)
 	} else {
-		l.errorLogger.Print(msg)
+		l.logger.Error(msg)
 	}
 }
 
-func (l *SimpleLogger) Debug(msg string, args ...interface{}) {
-	if !l.debug {
-		return
-	}
+func (l *LogrusLogger) Debug(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		l.debugLogger.Printf(msg, args...)
+		l.logger.Debugf(msg, args...)
 	} else {
-		l.debugLogger.Print(msg)
+		l.logger.Debug(msg)
 	}
 }
 
-func (l *SimpleLogger) Warn(msg string, args ...interface{}) {
+func (l *LogrusLogger) Warn(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		l.warnLogger.Printf(msg, args...)
+		l.logger.Warnf(msg, args...)
 	} else {
-		l.warnLogger.Print(msg)
+		l.logger.Warn(msg)
 	}
 }
 
@@ -97,11 +114,12 @@ func FormatErrorResponse(err error) string {
 }
 
 func TruncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return string(runes[:maxLen])
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }

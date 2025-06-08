@@ -9,6 +9,7 @@ import (
 	"mention-mcp-server/client"
 	"mention-mcp-server/config"
 	"mention-mcp-server/handlers"
+	"mention-mcp-server/services"
 	"mention-mcp-server/utils"
 )
 
@@ -30,7 +31,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	mentionClient := client.NewClient(cfg)
+	mentionClient := client.NewClient(cfg, logger)
+	alertService := services.NewAlertService(mentionClient, logger)
 
 	s := server.NewMCPServer(
 		cfg.Server.Name,
@@ -38,8 +40,9 @@ func main() {
 	)
 
 	handlerConfig := &handlers.Config{
-		Client: mentionClient,
-		Logger: logger,
+		Client:       mentionClient,
+		Logger:       logger,
+		AlertService: alertService,
 	}
 
 	handlers.RegisterAlertTools(s, handlerConfig)

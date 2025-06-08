@@ -29,13 +29,13 @@ type ServerConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		MentionAPI: MentionAPIConfig{
-			BaseURL:    "https://web.mention.net/api",
-			APIVersion: "1.21",
+			BaseURL:    DefaultAPIBaseURL,
+			APIVersion: DefaultAPIVersion,
 		},
 		Server: ServerConfig{
-			Name:    "mention-mcp",
-			Version: "0.1.0",
-			Timeout: 30,
+			Name:    DefaultServerName,
+			Version: DefaultServerVersion,
+			Timeout: int(DefaultTimeout.Seconds()),
 		},
 	}
 }
@@ -43,11 +43,14 @@ func DefaultConfig() *Config {
 func LoadConfig() (*Config, error) {
 	config := DefaultConfig()
 
-	if accessToken := os.Getenv("MENTION_ACCESS_TOKEN"); accessToken != "" {
+	if accessToken := os.Getenv(EnvAccessToken); accessToken != "" {
 		config.MentionAPI.AccessToken = accessToken
 	}
-	if accountID := os.Getenv("MENTION_ACCOUNT_ID"); accountID != "" {
+	if accountID := os.Getenv(EnvAccountID); accountID != "" {
 		config.MentionAPI.AccountID = accountID
+	}
+	if groupID := os.Getenv(EnvGroupID); groupID != "" {
+		config.MentionAPI.GroupID = groupID
 	}
 
 	configPath := getConfigPath()
@@ -66,7 +69,7 @@ func LoadConfig() (*Config, error) {
 
 func getConfigPath() string {
 	homeDir, _ := os.UserHomeDir()
-	return filepath.Join(homeDir, ".config", "mention-mcp", "config.json")
+	return filepath.Join(homeDir, DefaultConfigDir, ConfigFileName)
 }
 
 func loadConfigFile(config *Config, path string) error {
@@ -81,7 +84,7 @@ func loadConfigFile(config *Config, path string) error {
 func validateConfig(config *Config) error {
 	hasAccessToken := config.MentionAPI.AccessToken != ""
 	if !hasAccessToken {
-		return fmt.Errorf("either access token or client credentials (client_id and client_secret) are required")
+		return fmt.Errorf("access token are required")
 	}
 
 	return nil

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"mention-mcp-server/client"
+	"mention-mcp-server/services"
 )
 
 // RegisterAlertTools registers all alert-related MCP tools
@@ -65,20 +65,19 @@ func createAlertHandler(config *Config) func(context.Context, mcp.CallToolReques
 
 		requiredKeywords := request.GetStringSlice("required_keywords", nil)
 		excludedKeywords := request.GetStringSlice("excluded_keywords", nil)
+		sources := request.GetStringSlice("sources", nil)
+		languages := request.GetStringSlice("languages", nil)
+		countries := request.GetStringSlice("countries", nil)
 
-		req := client.CreateBasicAlertRequest{
-			Name: name,
-			Query: client.BasicAlertQuery{
-				Type:             "basic",
-				IncludedKeywords: includedKeywords,
-				RequiredKeywords: requiredKeywords,
-				ExcludedKeywords: excludedKeywords,
-			},
+		req := services.AlertCreateRequest{
+			Name:             name,
+			IncludedKeywords: includedKeywords,
+			RequiredKeywords: requiredKeywords,
+			ExcludedKeywords: excludedKeywords,
+			Sources:          sources,
+			Languages:        languages,
+			Countries:        countries,
 		}
-
-		req.Sources = request.GetStringSlice("sources", nil)
-		req.Languages = request.GetStringSlice("languages", nil)
-		req.Countries = request.GetStringSlice("countries", nil)
 
 		if reqJSON, err := json.Marshal(req); err == nil {
 			config.Logger.Info(fmt.Sprintf("CreateBasicAlert request: %s", string(reqJSON)))
@@ -86,7 +85,7 @@ func createAlertHandler(config *Config) func(context.Context, mcp.CallToolReques
 			config.Logger.Error("Failed to marshal request: %v", err)
 		}
 
-		alert, err := config.Client.CreateBasicAlert(ctx, req)
+		alert, err := config.AlertService.CreateBasicAlert(ctx, req)
 		if err != nil {
 			config.Logger.Error("Failed to create alert: %v", err)
 			return mcp.NewToolResultError(formatError(err)), nil
@@ -104,7 +103,7 @@ func createAlertHandler(config *Config) func(context.Context, mcp.CallToolReques
 
 func getAlertOptionsHandler(config *Config) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		appData, err := config.Client.GetAppData(ctx)
+		appData, err := config.AlertService.GetAppData(ctx)
 		if err != nil {
 			config.Logger.Error("Failed to get app data: %v", err)
 			return mcp.NewToolResultError(formatError(err)), nil
@@ -120,7 +119,6 @@ func getAlertOptionsHandler(config *Config) func(context.Context, mcp.CallToolRe
 			response["languages"].(map[string]string)[code] = lang.Name
 		}
 
-		// Convert sources to a simple map
 		for code, source := range appData.AlertSources {
 			response["sources"].(map[string]string)[code] = source.Name
 		}
