@@ -4,4 +4,3 @@ tsconfig.json
 node_modules/
 .git/
 .DS_Store
-mention-api-openapi.yaml

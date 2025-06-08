@@ -113,16 +113,6 @@ jobs:
             
             This release includes various improvements and bug fixes.
             
-            ### Installation
-            ```bash
-            npm install -g @MaelitoP/mention-mcp-server
-            ```
-            
-            ### Usage
-            ```bash
-            npx @MaelitoP/mention-mcp-server
-            ```
-            
             See the [README](https://github.com/MaelitoP/mention-mcp-server#readme) for full documentation.
           draft: false
           prerelease: false

@@ -3,7 +3,7 @@ name: Publish Package
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # For npm provenance
+      id-token: write
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch full history for semantic versioning
+          fetch-depth: 0
         
       - name: Setup Node.js
         uses: actions/setup-node@v4

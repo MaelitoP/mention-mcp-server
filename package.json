@@ -23,10 +23,10 @@
     "version:minor": "npm version minor",
     "version:major": "npm version major"
   },
-  "keywords": ["mcp", "mention", "monitoring", "api", "claude"],
+  "keywords": ["mcp", "mention", "monitoring", "api", "agorapulse"],
   "author": "MaelitoP",
   "license": "MIT",
-  "description": "MCP server for the Mention API to monitor web and social media mentions",
+  "description": "MCP server for the Mention API to monitor web and social media",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MaelitoP/mention-mcp-server.git"

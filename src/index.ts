@@ -15,7 +15,6 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 const API_BASE_URL = "https://web.mention.com/api";
 
-// Zod schemas for input validation
 const ListAlertsArgsSchema = z.object({
   limit: z
     .number()
@@ -151,57 +150,11 @@ const UnpauseAlertArgsSchema = z.object({
   alert_id: z.string().describe("The alert ID to unpause"),
 });
 
-const EstimateAlertArgsSchema = z.object({
-  query_type: z.enum(["basic", "advanced"]).describe("Type of query to estimate"),
-  included_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Keywords to include (for basic queries)"),
-  required_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Required keywords (for basic queries)"),
-  excluded_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Excluded keywords (for basic queries)"),
-  query_string: z.string().optional().describe("Advanced query string (for advanced queries)"),
-});
-
-const PreviewAlertArgsSchema = z.object({
-  query_type: z.enum(["basic", "advanced"]).describe("Type of query to preview"),
-  included_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Keywords to include (for basic queries)"),
-  required_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Required keywords (for basic queries)"),
-  excluded_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Excluded keywords (for basic queries)"),
-  query_string: z.string().optional().describe("Advanced query string (for advanced queries)"),
-});
-
 interface MentionAPIError {
   error: {
     code: number;
     message: string;
     details?: string;
-  };
-}
-
-interface QueryBody {
-  type: "basic" | "advanced";
-  included_keywords?: string[];
-  required_keywords?: string[];
-  excluded_keywords?: string[];
-  query_string?: string;
-  monitored_website?: {
-    domain: string;
-    block_self?: boolean;
   };
 }
 
@@ -315,13 +268,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "create_basic_alert",
         description:
-          "Create a new basic monitoring alert. Use this tool for accounts with no compagnie plans. Basic alerts use simple keyword matching with included_keywords, required_keywords, and excluded_keywords arrays.",
+          "Create a new basic monitoring alert. Basic alerts use simple keyword matching with included_keywords, required_keywords, and excluded_keywords arrays.",
         inputSchema: zodToJsonSchema(CreateBasicAlertArgsSchema),
       },
       {
         name: "create_advanced_alert",
         description:
-          "Create a new advanced monitoring alert with boolean query syntax. Use this tool for accounts on compagnie plans. Advanced alerts use complex query strings with boolean operators like AND, OR, NOT.",
+          "Create a new advanced monitoring alert with boolean query syntax. Advanced alerts use complex query strings with boolean operators like AND, OR, NOT.",
         inputSchema: zodToJsonSchema(CreateAdvancedAlertArgsSchema),
       },
       {
@@ -338,18 +291,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "unpause_alert",
         description: "Resume monitoring for a previously paused alert.",
         inputSchema: zodToJsonSchema(UnpauseAlertArgsSchema),
-      },
-      {
-        name: "estimate_alert",
-        description:
-          "Get an estimate of how many mentions would be captured by proposed alert criteria. Useful for testing alert settings before creation.",
-        inputSchema: zodToJsonSchema(EstimateAlertArgsSchema),
-      },
-      {
-        name: "preview_alert",
-        description:
-          "Get sample mentions that would match the proposed alert criteria. Shows actual examples of what the alert would capture.",
-        inputSchema: zodToJsonSchema(PreviewAlertArgsSchema),
       },
     ],
   };
@@ -595,92 +536,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "estimate_alert": {
-        const validated = EstimateAlertArgsSchema.parse(args);
-        const {
-          query_type,
-          included_keywords,
-          required_keywords,
-          excluded_keywords,
-          query_string,
-        } = validated;
-
-        const accountData = await makeAPIRequest("/accounts/me");
-        const accountId = accountData.account.id;
-
-        let query: QueryBody;
-        if (query_type === "basic") {
-          query = {
-            type: "basic",
-            included_keywords,
-            required_keywords,
-            excluded_keywords,
-          };
-        } else {
-          query = {
-            type: "advanced",
-            query_string,
-          };
-        }
-
-        const data = await makeAPIRequest(`/accounts/${accountId}/alerts/estimate`, {
-          method: "POST",
-          body: JSON.stringify(query),
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "preview_alert": {
-        const validated = PreviewAlertArgsSchema.parse(args);
-        const {
-          query_type,
-          included_keywords,
-          required_keywords,
-          excluded_keywords,
-          query_string,
-        } = validated;
-
-        const accountData = await makeAPIRequest("/accounts/me");
-        const accountId = accountData.account.id;
-
-        let query: QueryBody;
-        if (query_type === "basic") {
-          query = {
-            type: "basic",
-            included_keywords,
-            required_keywords,
-            excluded_keywords,
-          };
-        } else {
-          query = {
-            type: "advanced",
-            query_string,
-          };
-        }
-
-        const data = await makeAPIRequest(`/accounts/${accountId}/alerts/preview`, {
-          method: "POST",
-          body: JSON.stringify(query),
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     }
@@ -704,7 +559,6 @@ async function main() {
   try {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    // Server is now running - no logging needed as it interferes with stdio protocol
   } catch (error) {
     logError("Failed to start MCP server", error);
     process.exit(1);
