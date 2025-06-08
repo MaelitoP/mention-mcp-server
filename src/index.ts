@@ -315,11 +315,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "get_account_info": {
         const data = await makeAPIRequest("/accounts/me");
+        
+        // Extract only essential information to avoid hitting context limits
+        const filteredResponse = {
+          accountId: data.account?.id,
+          canCreateAdvancedAlert: data.account?.subscription?.advanced_query_access,
+          groups: data.account?.groups?.map((group: any) => ({
+            id: group.id,
+            name: group.name,
+          })) || [],
+        };
+        
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: JSON.stringify(filteredResponse, null, 2),
             },
           ],
         };
@@ -327,11 +338,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "get_app_data": {
         const data = await makeAPIRequest("/app/data");
+        
+        // Extract only essential information for alert creation to avoid hitting context limits
+        const filteredResponse = {
+          languages: Object.entries(data.alert_languages || {}).map(([code, lang]: [string, any]) => ({
+            code,
+            name: lang.name,
+          })),
+          countries: data.alert_countries || {},
+          sources: Object.entries(data.alert_sources || {})
+            .filter(([_, source]: [string, any]) => !source.hidden)
+            .map(([code, source]: [string, any]) => ({
+              code,
+              name: source.name,
+            })),
+        };
+        
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: JSON.stringify(filteredResponse, null, 2),
             },
           ],
         };
