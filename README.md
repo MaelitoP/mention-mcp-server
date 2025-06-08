@@ -1,51 +1,42 @@
 # Mention MCP Server
 
-A Model Context Protocol (MCP) server for integrating with Mention's brand monitoring API. This server enables LLMs to create alerts, fetch mentions, analyze sentiment, and manage brand monitoring workflows through Mention's platform.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![NPM Version](https://img.shields.io/npm/v/@MaelitoP/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
+[![NPM Downloads](https://img.shields.io/npm/dm/@MaelitoP/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
 
-## Installation
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) is an open protocol designed for effortless integration between LLM applications and external data sources or tools, offering a standardized framework to seamlessly provide LLMs with the context they require.
 
-### Prerequisites
-- Go 1.21 or later
-- Mention API Key
+This server supplies tools designed to support social listening and monitoring capabilities through the Mention API.
 
-### Build from Source
-```bash
-git clone https://github.com/MaelitoP/mention-mcp-server.git
-cd mention-mcp-server
-go mod tidy
-go install
-```
+## Supported Tools
 
-## Configuration
+| Tool | Description |
+|------|-------------|
+| `get_account_info` | Retrieve account details and subscription plan |
+| `get_app_data` | Get available languages, countries, sources |
+| `list_alerts` | List all monitoring alerts with pagination |
+| `get_alert` | Get detailed information about specific alerts |
+| `create_basic_alert` | Create alerts with simple keyword matching |
+| `create_advanced_alert` | Create alerts with boolean query syntax |
+| `update_alert` | Modify existing alert criteria and settings |
 
-Create a configuration file at `~/.config/mention-mcp/config.json`:
+## Usage with Claude Desktop
+
+Add the following to your Claude Desktop configuration file:
 ```json
 {
-  "mention_api": {
-    "access_token": "your-access-token",
-    "account_id": "your-account-id",
-    "group_id": "your-group-id"
-  },
-  "server": {
-    "name": "mention-mcp",
-    "version": "0.1.0",
-    "timeout": 30
+  "mcpServers": {
+    "mention": {
+      "command": "npx",
+      "args": ["-y", "@MaelitoP/mention-mcp-server"],
+      "env": {
+        "MENTION_API_KEY": "your_mention_api_key_here"
+      }
+    }
   }
 }
 ```
 
-## Architecture
+## License
 
-```
-mention-mcp-server/
-├── main.go           # Entry point and MCP server setup
-├── config/           # Configuration management
-├── client/           # Mention API client
-├── handlers/         # MCP tool handlers
-├── models/           # Data models
-└── utils/            # Utility functions
-```
-
----
-
-Built with the [MCP Go SDK](https://github.com/mark3labs/mcp-go)
+This project is licensed under the [MIT License](LICENSE).
