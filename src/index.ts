@@ -13,6 +13,41 @@ import {
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
+// API Response Schemas
+const GroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+const AccountResponseSchema = z.object({
+  account: z.object({
+    id: z.string(),
+    subscription: z.object({
+      advanced_query_access: z.boolean(),
+    }),
+    groups: z.array(GroupSchema).optional(),
+  }),
+});
+
+const LanguageSchema = z.record(
+  z.object({
+    name: z.string(),
+  })
+);
+
+const SourceSchema = z.record(
+  z.object({
+    name: z.string(),
+    hidden: z.boolean(),
+  })
+);
+
+const AppDataResponseSchema = z.object({
+  alert_languages: LanguageSchema.optional(),
+  alert_countries: z.record(z.string()).optional(),
+  alert_sources: SourceSchema.optional(),
+});
+
 const API_BASE_URL = "https://web.mention.com/api";
 
 const ListAlertsArgsSchema = z.object({
@@ -314,18 +349,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "get_account_info": {
-        const data = await makeAPIRequest("/accounts/me");
-        
+        const rawData = await makeAPIRequest("/accounts/me");
+        const data = AccountResponseSchema.parse(rawData);
+
         // Extract only essential information to avoid hitting context limits
         const filteredResponse = {
-          accountId: data.account?.id,
-          canCreateAdvancedAlert: data.account?.subscription?.advanced_query_access,
-          groups: data.account?.groups?.map((group: any) => ({
-            id: group.id,
-            name: group.name,
-          })) || [],
+          accountId: data.account.id,
+          canCreateAdvancedAlert: data.account.subscription.advanced_query_access,
+          groups:
+            data.account.groups?.map((group) => ({
+              id: group.id,
+              name: group.name,
+            })) || [],
         };
-        
+
         return {
           content: [
             {
@@ -337,23 +374,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "get_app_data": {
-        const data = await makeAPIRequest("/app/data");
-        
+        const rawData = await makeAPIRequest("/app/data");
+        const data = AppDataResponseSchema.parse(rawData);
+
         // Extract only essential information for alert creation to avoid hitting context limits
         const filteredResponse = {
-          languages: Object.entries(data.alert_languages || {}).map(([code, lang]: [string, any]) => ({
+          languages: Object.entries(data.alert_languages || {}).map(([code, lang]) => ({
             code,
             name: lang.name,
           })),
           countries: data.alert_countries || {},
           sources: Object.entries(data.alert_sources || {})
-            .filter(([_, source]: [string, any]) => !source.hidden)
-            .map(([code, source]: [string, any]) => ({
+            .filter(([_, source]) => !source.hidden)
+            .map(([code, source]) => ({
               code,
               name: source.name,
             })),
         };
-        
+
         return {
           content: [
             {
