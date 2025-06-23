@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// API Response Schemas
 export const GroupSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -35,7 +34,6 @@ export const AppDataResponseSchema = z.object({
   alert_sources: SourceSchema.optional(),
 });
 
-// Tool Arguments Schemas
 export const ListAlertsArgsSchema = z.object({
   limit: z
     .number()
@@ -173,7 +171,6 @@ export const UnpauseAlertArgsSchema = z.object({
   alert_id: z.string().describe("The alert ID to unpause"),
 });
 
-// TypeScript Types
 export interface MentionAPIError {
   error: {
     code: number;

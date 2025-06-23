@@ -52,7 +52,6 @@ export class MentionAPIClient {
         }`;
         logError("Mention API error", errorData.error, { requestId, endpoint });
 
-        // Map specific API errors to appropriate MCP errors
         if (response.status === 401) {
           throw new McpError(ErrorCode.InvalidRequest, "Invalid API key");
         }
@@ -103,7 +102,6 @@ export class MentionAPIClient {
       const rawData = await this.makeRequest("/accounts/me");
       const data = AccountResponseSchema.parse(rawData);
 
-      // Cache the account info
       this.accountCache = data;
       this.accountCacheExpiry = now + this.accountCacheTTL;
 
