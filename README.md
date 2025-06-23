@@ -1,8 +1,8 @@
 # Mention MCP Server
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![NPM Version](https://img.shields.io/npm/v/@MaelitoP/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
-[![NPM Downloads](https://img.shields.io/npm/dm/@MaelitoP/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
+[![NPM Version](https://img.shields.io/npm/v/@maelitop/mention-mcp-server.svg)](https://www.npmjs.com/package/@maelitop/mention-mcp-server)
+[![NPM Downloads](https://img.shields.io/npm/dm/@maelitop/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
 
 A production-ready [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server for social listening and monitoring through the Mention API. Built with TypeScript, comprehensive error handling, structured logging, and modular architecture.
 
