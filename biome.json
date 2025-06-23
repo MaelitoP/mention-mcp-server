@@ -33,6 +33,18 @@
       }
     }
   },
+  "overrides": [
+    {
+      "include": ["**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double",

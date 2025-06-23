@@ -1,0 +1,190 @@
+import { z } from "zod";
+
+export const GroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const AccountResponseSchema = z.object({
+  account: z.object({
+    id: z.string(),
+    subscription: z.object({
+      advanced_query_access: z.boolean(),
+    }),
+    groups: z.array(GroupSchema).optional(),
+  }),
+});
+
+export const LanguageSchema = z.record(
+  z.object({
+    name: z.string(),
+  })
+);
+
+export const SourceSchema = z.record(
+  z.object({
+    name: z.string(),
+    hidden: z.boolean(),
+  })
+);
+
+export const AppDataResponseSchema = z.object({
+  alert_languages: LanguageSchema.optional(),
+  alert_countries: z.record(z.string()).optional(),
+  alert_sources: SourceSchema.optional(),
+});
+
+export const ListAlertsArgsSchema = z.object({
+  limit: z
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("Maximum number of alerts to return (1-100)"),
+  cursor: z.string().optional().describe("Pagination cursor for retrieving next page"),
+});
+
+export const GetAlertArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID to retrieve"),
+});
+
+export const CreateBasicAlertArgsSchema = z.object({
+  group_id: z.string().describe("Group ID to which the alert should be associated"),
+  name: z.string().min(1).max(255).describe("Alert name (required, 1-255 characters)"),
+  description: z
+    .string()
+    .max(1000)
+    .optional()
+    .describe("Alert description (optional, max 1000 characters)"),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional()
+    .describe("Alert color code (e.g., '#05e363')"),
+  included_keywords: z
+    .array(z.string())
+    .min(1)
+    .describe("Keywords to include - at least one keyword that should be present in mentions"),
+  required_keywords: z
+    .array(z.string())
+    .optional()
+    .describe("Keywords that must be present in all mentions (optional)"),
+  excluded_keywords: z
+    .array(z.string())
+    .optional()
+    .describe("Keywords to exclude from mentions (optional)"),
+  monitored_website: z
+    .object({
+      domain: z.string().describe("Domain to specifically monitor"),
+      block_self: z.boolean().optional().describe("Whether to block mentions from own site"),
+    })
+    .optional()
+    .describe("Specific website monitoring configuration (optional)"),
+  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
+  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+  sources: z
+    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
+    .optional()
+    .describe("Sources to monitor"),
+  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
+  noise_detection: z
+    .boolean()
+    .default(true)
+    .optional()
+    .describe("Enable noise detection (default: true)"),
+});
+
+export const CreateAdvancedAlertArgsSchema = z.object({
+  group_id: z.string().describe("Group ID to which the alert should be associated"),
+  name: z.string().min(1).max(255).describe("Alert name (required, 1-255 characters)"),
+  description: z
+    .string()
+    .max(1000)
+    .optional()
+    .describe("Alert description (optional, max 1000 characters)"),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional()
+    .describe("Alert color code (e.g., '#05e363')"),
+  query_string: z
+    .string()
+    .describe(
+      "Advanced query string with boolean operators (e.g., '(NASA OR SpaceX) AND mars NOT nose')"
+    ),
+  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
+  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+  sources: z
+    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
+    .optional()
+    .describe("Sources to monitor"),
+  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
+  noise_detection: z
+    .boolean()
+    .default(true)
+    .optional()
+    .describe("Enable noise detection (default: true)"),
+});
+
+export const UpdateAlertArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID to update"),
+  name: z.string().min(1).max(255).optional().describe("New alert name (1-255 characters)"),
+  description: z
+    .string()
+    .max(1000)
+    .optional()
+    .describe("New alert description (max 1000 characters)"),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional()
+    .describe("New alert color code"),
+  query_type: z.enum(["basic", "advanced"]).optional().describe("Type of query to update"),
+  included_keywords: z
+    .array(z.string())
+    .optional()
+    .describe("Keywords to include (for basic queries)"),
+  required_keywords: z
+    .array(z.string())
+    .optional()
+    .describe("Required keywords (for basic queries)"),
+  excluded_keywords: z
+    .array(z.string())
+    .optional()
+    .describe("Excluded keywords (for basic queries)"),
+  query_string: z.string().optional().describe("Advanced query string (for advanced queries)"),
+  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
+  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+  sources: z
+    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
+    .optional()
+    .describe("Sources to monitor"),
+  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
+  noise_detection: z.boolean().optional().describe("Enable noise detection"),
+});
+
+export const PauseAlertArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID to pause"),
+});
+
+export const UnpauseAlertArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID to unpause"),
+});
+
+export interface MentionAPIError {
+  error: {
+    code: number;
+    message: string;
+    details?: string;
+  };
+}
+
+export type AccountResponse = z.infer<typeof AccountResponseSchema>;
+export type AppDataResponse = z.infer<typeof AppDataResponseSchema>;
+export type ListAlertsArgs = z.infer<typeof ListAlertsArgsSchema>;
+export type GetAlertArgs = z.infer<typeof GetAlertArgsSchema>;
+export type CreateBasicAlertArgs = z.infer<typeof CreateBasicAlertArgsSchema>;
+export type CreateAdvancedAlertArgs = z.infer<typeof CreateAdvancedAlertArgsSchema>;
+export type UpdateAlertArgs = z.infer<typeof UpdateAlertArgsSchema>;
+export type PauseAlertArgs = z.infer<typeof PauseAlertArgsSchema>;
+export type UnpauseAlertArgs = z.infer<typeof UnpauseAlertArgsSchema>;
