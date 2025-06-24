@@ -36,6 +36,7 @@ describe("Schema Validation", () => {
   describe("CreateBasicAlertArgsSchema", () => {
     it("should validate minimal valid alert", () => {
       const valid = {
+        group_id: "group-123",
         name: "Test Alert",
         included_keywords: ["test"],
       };
@@ -44,6 +45,7 @@ describe("Schema Validation", () => {
 
     it("should validate complete alert", () => {
       const valid = {
+        group_id: "group-123",
         name: "Complete Alert",
         description: "A test alert",
         color: "#ff0000",
@@ -101,6 +103,7 @@ describe("Schema Validation", () => {
   describe("CreateAdvancedAlertArgsSchema", () => {
     it("should validate minimal advanced alert", () => {
       const valid = {
+        group_id: "group-123",
         name: "Advanced Alert",
         query_string: "(NASA OR SpaceX) AND mars",
       };
