@@ -123,6 +123,7 @@ describe("Tools", () => {
     describe("handleCreateBasicAlert", () => {
       it("should create basic alert", async () => {
         const alertArgs = {
+          group_id: "group-123",
           name: "Test Alert",
           included_keywords: ["test"],
           excluded_keywords: ["spam"],
@@ -138,6 +139,7 @@ describe("Tools", () => {
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
           method: "POST",
           body: JSON.stringify({
+            group_id: "group-123",
             name: "Test Alert",
             query: {
               type: "basic",
@@ -155,6 +157,7 @@ describe("Tools", () => {
     describe("handleCreateAdvancedAlert", () => {
       it("should create advanced alert", async () => {
         const alertArgs = {
+          group_id: "group-123",
           name: "Advanced Alert",
           query_string: "(NASA OR SpaceX) AND mars",
         };
@@ -169,6 +172,7 @@ describe("Tools", () => {
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
           method: "POST",
           body: JSON.stringify({
+            group_id: "group-123",
             name: "Advanced Alert",
             query: {
               type: "advanced",
