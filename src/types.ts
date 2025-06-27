@@ -80,22 +80,31 @@ export const CreateBasicAlertArgsSchema = z.object({
     })
     .optional()
     .describe("Specific website monitoring configuration (optional)"),
-  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
-  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+  languages: z
+    .array(z.string())
+    .max(5)
+    .describe(
+      "Language codes to monitor. Use get_app_data tool to see which language code are supported. Ask the user which language he would like to monitor. On advanced alert, it only applies to monitored pages and reviews pages. For keywords monitoring you should use the 'lang' operator in the query string."
+    ),
   sources: z
-    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
+    .array(z.string())
+    .describe(
+      "Sources to monitor. List availabled sources using get_app_data tool. Ask the user to know which source they want to monitor."
+    ),
+
+  blocked_sites: z
+    .array(z.string())
     .optional()
-    .describe("Sources to monitor"),
-  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
-  noise_detection: z
-    .boolean()
-    .default(true)
-    .optional()
-    .describe("Enable noise detection (default: true)"),
+    .describe("An array of blocked sites from which you don't want mentions to be tracked."),
+  noise_detection: z.boolean().default(false).optional(),
 });
 
 export const CreateAdvancedAlertArgsSchema = z.object({
-  group_id: z.string().describe("Group ID to which the alert should be associated"),
+  group_id: z
+    .string()
+    .describe(
+      "Group ID to which the alert should be associated. Ask user to which group he would like to create the alert on"
+    ),
   name: z.string().min(1).max(255).describe("Alert name (required, 1-255 characters)"),
   description: z
     .string()
@@ -106,24 +115,28 @@ export const CreateAdvancedAlertArgsSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional()
-    .describe("Alert color code (e.g., '#05e363')"),
+    .describe("Alert color (in hex color code format)"),
   query_string: z
     .string()
     .describe(
-      "Advanced query string with boolean operators (e.g., '(NASA OR SpaceX) AND mars NOT nose')"
+      "Advanced query string using boolean operators (e.g., '(NASA OR SpaceX) AND foo AND NOT baz')"
     ),
-  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
-  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+  languages: z
+    .array(z.string())
+    .max(5)
+    .describe(
+      "Language codes to monitor. Use get_app_data tool to see which language code are supported. Ask the user which language he would like to monitor. On advanced alert, it only applies to monitored pages and reviews pages. For keywords monitoring you should use the 'lang' selector in the query string."
+    ),
   sources: z
-    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
+    .array(z.string())
+    .describe(
+      "Sources to monitor. List availabled sources using get_app_data tool. Ask the user to know which source they want to monitor."
+    ),
+  blocked_sites: z
+    .array(z.string())
     .optional()
-    .describe("Sources to monitor"),
-  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
-  noise_detection: z
-    .boolean()
-    .default(true)
-    .optional()
-    .describe("Enable noise detection (default: true)"),
+    .describe("An array of blocked sites from which you don't want mentions to be tracked."),
+  noise_detection: z.boolean().default(false).optional(),
 });
 
 export const UpdateAlertArgsSchema = z.object({
@@ -171,6 +184,14 @@ export const UnpauseAlertArgsSchema = z.object({
   alert_id: z.string().describe("The alert ID to unpause"),
 });
 
+export const BuildBooleanQueryPromptArgsSchema = z.object({
+  instructions: z
+    .string()
+    .describe(
+      "What the Boolean query should match, e.g., 'Mentions about NASA in English from the US or Canada'"
+    ),
+});
+
 export interface MentionAPIError {
   error: {
     code: number;
@@ -188,3 +209,4 @@ export type CreateAdvancedAlertArgs = z.infer<typeof CreateAdvancedAlertArgsSche
 export type UpdateAlertArgs = z.infer<typeof UpdateAlertArgsSchema>;
 export type PauseAlertArgs = z.infer<typeof PauseAlertArgsSchema>;
 export type UnpauseAlertArgs = z.infer<typeof UnpauseAlertArgsSchema>;
+export type BuildBooleanQueryPromptArgs = z.infer<typeof BuildBooleanQueryPromptArgsSchema>;
