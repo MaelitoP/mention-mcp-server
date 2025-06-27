@@ -1,41 +1,38 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import {
-	type BuildBooleanQueryPromptArgs,
-	BuildBooleanQueryPromptArgsSchema,
-} from "../types.js";
+import { type BuildBooleanQueryPromptArgs, BuildBooleanQueryPromptArgsSchema } from "../types.js";
 import type { Prompt, PromptDefinition, PromptHandler } from "./base.js";
 
 export const buildBooleanQueryPrompt: Prompt = {
-	getDefinition(): PromptDefinition {
-		return {
-			name: "build-boolean-query",
-			description:
-				"Generate a valid Boolean query string using Boolean operators, quoted terms, proximity, and field selectors",
-			arguments: [
-				{
-					name: "instructions",
-					description:
-						"What the Boolean query should match, e.g., 'Mentions about NASA in English from the US or Canada'",
-					required: true,
-				},
-			],
-		};
-	},
+  getDefinition(): PromptDefinition {
+    return {
+      name: "build-boolean-query",
+      description:
+        "Generate a valid Boolean query string using Boolean operators, quoted terms, proximity, and field selectors",
+      arguments: [
+        {
+          name: "instructions",
+          description:
+            "What the Boolean query should match, e.g., 'Mentions about NASA in English from the US or Canada'",
+          required: true,
+        },
+      ],
+    };
+  },
 
-	createHandler(): PromptHandler {
-		return {
-			async handle(args: unknown) {
-				const parsedArgs = BuildBooleanQueryPromptArgsSchema.parse(
-					args,
-				) as BuildBooleanQueryPromptArgs;
+  createHandler(): PromptHandler {
+    return {
+      async handle(args: unknown) {
+        const parsedArgs = BuildBooleanQueryPromptArgsSchema.parse(
+          args
+        ) as BuildBooleanQueryPromptArgs;
 
-				return {
-					messages: [
-						{
-							role: "user",
-							content: {
-								type: "text",
-								text: `You are generating a valid Boolean query string using the following rules:
+        return {
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: `You are generating a valid Boolean query string using the following rules:
                   1. Combine clauses using AND, OR, and NOT. Wrap mixed clauses in parentheses.
                   2. A clause can be:
                      - A term: single word (e.g. NASA)
@@ -64,11 +61,11 @@ export const buildBooleanQueryPrompt: Prompt = {
                   Generate a Boolean query for the following:
                   ${parsedArgs.instructions}
                 `,
-							},
-						},
-					],
-				};
-			},
-		};
-	},
+              },
+            },
+          ],
+        };
+      },
+    };
+  },
 };
