@@ -223,10 +223,7 @@ export const FetchMentionsArgsSchema = z.object({
     .default(20)
     .optional()
     .describe("Number of mentions to return. Default is 20, max is 1000."),
-  source: z
-    .string()
-    .optional()
-    .describe("Filter by source"),
+  source: z.string().optional().describe("Filter by source"),
   unread: z
     .boolean()
     .optional()
