@@ -1,7 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { MentionAPIClient } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
-import { CreateBasicAlertArgsSchema } from "../types.js";
+import { CreateAlertResponseSchema, CreateBasicAlertArgsSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
 
 function createBasicAlertHandler(apiClient: MentionAPIClient): ToolHandler {
@@ -35,18 +35,24 @@ function createBasicAlertHandler(apiClient: MentionAPIClient): ToolHandler {
           },
         };
 
-        const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts`, {
+        const rawData = await apiClient.makeRequest(`/accounts/${accountId}/alerts`, {
           method: "POST",
           body: JSON.stringify(requestBody),
         });
 
-        logInfo("Basic alert created", { accountId, alertName: validated.name });
+        const data = CreateAlertResponseSchema.parse(rawData);
+
+        logInfo("Basic alert created", {
+          accountId,
+          alertName: validated.name,
+          alertId: data.alert.id,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: data.alert.id,
             },
           ],
         };

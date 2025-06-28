@@ -1,7 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { MentionAPIClient } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
-import { CreateAdvancedAlertArgsSchema } from "../types.js";
+import { CreateAdvancedAlertArgsSchema, CreateAlertResponseSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
 
 function createAdvancedAlertHandler(apiClient: MentionAPIClient): ToolHandler {
@@ -26,22 +26,41 @@ function createAdvancedAlertHandler(apiClient: MentionAPIClient): ToolHandler {
           },
         };
 
-        const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts`, {
+        const rawData = await apiClient.makeRequest(`/accounts/${accountId}/alerts`, {
           method: "POST",
           body: JSON.stringify(requestBody),
         });
 
-        logInfo("Advanced alert created", { accountId, alertName: validated.name });
+        const data = CreateAlertResponseSchema.parse(rawData);
+
+        logInfo("Advanced alert created", {
+          accountId,
+          alertName: validated.name,
+          alertId: data.alert.id,
+        });
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: data.alert.id,
             },
           ],
         };
       } catch (error) {
+        // Check if this is a boolean query validation error
+        if (error instanceof Error && error.message.includes("boolean_errors")) {
+          logError("Boolean query validation failed", error);
+          throw new Error(`Boolean query validation failed. Common issues:
+- Use url:domain.com instead of domain.com for websites
+- Ensure proper boolean operators (AND, OR, NOT)
+- Use quotes for phrases: "cold email"
+- Max 1700 characters
+- Example: (Lemlist OR url:lemlist.com OR "cold email") AND -spam
+
+Original error: ${error.message}`);
+        }
+
         logError("Failed to create advanced alert", error);
         throw error;
       }

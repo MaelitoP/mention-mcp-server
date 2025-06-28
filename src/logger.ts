@@ -15,7 +15,6 @@ function getLogDirectory(): string {
     logDir = join(homedir(), ".local", "share", "mention-mcp-server", "logs");
   }
 
-  // Ensure log directory exists
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }

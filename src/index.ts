@@ -7,6 +7,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
@@ -15,6 +16,7 @@ import {
 import { MentionAPIClient } from "./api-client.js";
 import { loadConfig } from "./config.js";
 import { logError, logInfo } from "./logger.js";
+import { prompts } from "./prompts/index.js";
 import { ToolHandlers, getToolDefinitions } from "./tools/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -73,8 +75,18 @@ async function createServer() {
 
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     return {
-      prompts: [],
+      prompts: prompts.map((prompt) => prompt.getDefinition()),
     };
+  });
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const prompt = prompts.find((p) => p.getDefinition().name === name);
+    if (!prompt) {
+      throw new Error(`Unknown prompt: ${name}`);
+    }
+    const handler = prompt.createHandler();
+    return await handler.handle(args);
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
