@@ -74,7 +74,7 @@ describe("MentionAPIClient", () => {
       mockFetch.mockResolvedValue(mockResponse as any);
 
       await expect(client.makeRequest("/test")).rejects.toThrow(
-        new McpError(ErrorCode.InvalidRequest, "Access denied - check subscription plan")
+        new McpError(ErrorCode.InvalidRequest, "Access denied")
       );
     });
 

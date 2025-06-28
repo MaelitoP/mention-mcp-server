@@ -26,7 +26,7 @@ describe("Tools", () => {
     it("should return all tool definitions", () => {
       const tools = getToolDefinitions();
 
-      expect(tools).toHaveLength(9);
+      expect(tools).toHaveLength(10);
       expect(tools.map((t) => t.name)).toEqual([
         "get_account_info",
         "get_app_data",
@@ -37,6 +37,7 @@ describe("Tools", () => {
         "update_alert",
         "pause_alert",
         "unpause_alert",
+        "fetch_mentions",
       ]);
     });
 
@@ -127,9 +128,11 @@ describe("Tools", () => {
           name: "Test Alert",
           included_keywords: ["test"],
           excluded_keywords: ["spam"],
+          languages: ["en"],
+          sources: ["web"],
         };
 
-        const mockResponse = { id: "new-alert", name: "Test Alert" };
+        const mockResponse = { alert: { id: "new-alert" } };
 
         (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
         (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
@@ -141,6 +144,8 @@ describe("Tools", () => {
           body: JSON.stringify({
             group_id: "group-123",
             name: "Test Alert",
+            languages: ["en"],
+            sources: ["web"],
             query: {
               type: "basic",
               included_keywords: ["test"],
@@ -150,7 +155,7 @@ describe("Tools", () => {
             },
           }),
         });
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+        expect(result.content[0].text).toBe("new-alert");
       });
     });
 
@@ -160,9 +165,11 @@ describe("Tools", () => {
           group_id: "group-123",
           name: "Advanced Alert",
           query_string: "(NASA OR SpaceX) AND mars",
+          languages: ["en"],
+          sources: ["web"],
         };
 
-        const mockResponse = { id: "new-alert", name: "Advanced Alert" };
+        const mockResponse = { alert: { id: "new-alert" } };
 
         (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
         (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
@@ -174,12 +181,93 @@ describe("Tools", () => {
           body: JSON.stringify({
             group_id: "group-123",
             name: "Advanced Alert",
+            languages: ["en"],
+            sources: ["web"],
             query: {
               type: "advanced",
               query_string: "(NASA OR SpaceX) AND mars",
             },
           }),
         });
+        expect(result.content[0].text).toBe("new-alert");
+      });
+    });
+
+    describe("handleFetchMentions", () => {
+      it("should fetch mentions with basic parameters", async () => {
+        const mentionsArgs = {
+          alert_id: "alert-123",
+          limit: 10,
+          folder: "inbox" as const,
+        };
+
+        const mockResponse = {
+          mentions: [
+            { id: "mention-1", content: "Test mention 1" },
+            { id: "mention-2", content: "Test mention 2" },
+          ],
+          _links: {
+            more: { href: "https://api.mention.net/api/.../mentions?cursor=older" },
+            pull: { href: "https://api.mention.net/api/.../mentions?cursor=newer" },
+          },
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/alerts/alert-123/mentions?limit=10&folder=inbox"
+        );
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it("should fetch mentions with complex filters", async () => {
+        const mentionsArgs = {
+          alert_id: "alert-456",
+          limit: 50,
+          source: "twitter",
+          tone: [1],
+          countries: ["US", "FR"],
+          languages: ["en", "fr"],
+          unread: true,
+        };
+
+        const mockResponse = {
+          mentions: [{ id: "mention-1", content: "Twitter mention" }],
+          _links: {},
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
+
+        const expectedUrl =
+          "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone=1&countries=US&countries=FR&languages=en&languages=fr";
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it("should fetch mentions with no parameters", async () => {
+        const mentionsArgs = {
+          alert_id: "alert-789",
+        };
+
+        const mockResponse = {
+          mentions: [],
+          _links: {},
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/alerts/alert-789/mentions"
+        );
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });
     });

@@ -39,6 +39,8 @@ describe("Schema Validation", () => {
         group_id: "group-123",
         name: "Test Alert",
         included_keywords: ["test"],
+        languages: ["en"],
+        sources: ["web"],
       };
       expect(() => CreateBasicAlertArgsSchema.parse(valid)).not.toThrow();
     });
@@ -106,6 +108,8 @@ describe("Schema Validation", () => {
         group_id: "group-123",
         name: "Advanced Alert",
         query_string: "(NASA OR SpaceX) AND mars",
+        languages: ["en"],
+        sources: ["web"],
       };
       expect(() => CreateAdvancedAlertArgsSchema.parse(valid)).not.toThrow();
     });
