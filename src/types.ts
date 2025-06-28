@@ -198,6 +198,74 @@ export const BuildBooleanQueryPromptArgsSchema = z.object({
     ),
 });
 
+export const FetchMentionsArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID to fetch mentions from"),
+  since_id: z
+    .number()
+    .optional()
+    .describe(
+      "Return mentions with ID greater than this value. Cannot be used with before_date, not_before_date, or cursor."
+    ),
+  before_date: z
+    .string()
+    .optional()
+    .describe("Return mentions published before this datetime (ISO8601 format)"),
+  not_before_date: z
+    .string()
+    .optional()
+    .describe(
+      "Ignore mentions older than this date (ISO8601 format). Must be used with before_date."
+    ),
+  limit: z
+    .number()
+    .min(1)
+    .max(1000)
+    .default(20)
+    .optional()
+    .describe("Number of mentions to return. Default is 20, max is 1000."),
+  source: z.string().optional().describe("Filter by source"),
+  unread: z
+    .boolean()
+    .optional()
+    .describe("Return only unread mentions. Cannot be used with favorite, q, or tone."),
+  favorite: z
+    .boolean()
+    .optional()
+    .describe(
+      "Return only favorite mentions. Cannot be used with folder unless it is 'inbox' or 'archive'."
+    ),
+  folder: z
+    .enum(["inbox", "archive", "spam", "trash"])
+    .optional()
+    .describe("Filter by folder: inbox, archive, spam, trash"),
+  tone: z
+    .array(z.number().int().min(-1).max(1))
+    .optional()
+    .describe("Filter by tone: -1 = negative, 0 = neutral, 1 = positive. Multiple values allowed."),
+  countries: z
+    .array(z.string().length(2))
+    .optional()
+    .describe("Filter by country codes (ISO 3166-1 alpha-2). Multiple values allowed."),
+  include_children: z.boolean().optional().describe("Whether to include child mentions"),
+  sort: z
+    .enum([
+      "published_at",
+      "author_influence.score",
+      "direct_reach",
+      "cumulative_reach",
+      "domain_reach",
+    ])
+    .optional()
+    .describe("Sort by field"),
+  languages: z
+    .array(z.string())
+    .optional()
+    .describe("Filter by language codes. Multiple values allowed."),
+  timezone: z.string().optional().describe("Timezone for parsing date values in q parameter"),
+  q: z.string().optional().describe("Advanced keyword-based filtering"),
+  cursor: z.string().optional().describe("Pagination cursor for navigating results"),
+});
+
 export interface MentionAPIError {
   error: {
     code: number;
@@ -216,3 +284,4 @@ export type UpdateAlertArgs = z.infer<typeof UpdateAlertArgsSchema>;
 export type PauseAlertArgs = z.infer<typeof PauseAlertArgsSchema>;
 export type UnpauseAlertArgs = z.infer<typeof UnpauseAlertArgsSchema>;
 export type BuildBooleanQueryPromptArgs = z.infer<typeof BuildBooleanQueryPromptArgsSchema>;
+export type FetchMentionsArgs = z.infer<typeof FetchMentionsArgsSchema>;
