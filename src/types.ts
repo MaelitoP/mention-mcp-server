@@ -34,6 +34,12 @@ export const AppDataResponseSchema = z.object({
   alert_sources: SourceSchema.optional(),
 });
 
+export const CreateAlertResponseSchema = z.object({
+  alert: z.object({
+    id: z.string(),
+  }),
+});
+
 export const ListAlertsArgsSchema = z.object({
   limit: z
     .number()

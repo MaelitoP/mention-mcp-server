@@ -16,17 +16,11 @@ function createGetAppDataHandler(apiClient: MentionAPIClient): ToolHandler {
         const data = AppDataResponseSchema.parse(rawData);
 
         const filteredResponse = {
-          languages: Object.entries(data.alert_languages || {}).map(([code, lang]) => ({
-            code,
-            name: lang.name,
-          })),
-          countries: data.alert_countries || {},
+          languages: Object.keys(data.alert_languages || {}),
+          countries: Object.keys(data.alert_countries || {}),
           sources: Object.entries(data.alert_sources || {})
             .filter(([_, source]) => !source.hidden)
-            .map(([code, source]) => ({
-              code,
-              name: source.name,
-            })),
+            .map(([code]) => code),
         };
 
         logInfo("App data retrieved");

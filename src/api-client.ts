@@ -38,25 +38,49 @@ export class MentionAPIClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        let errorData: MentionAPIError;
+        let rawErrorData: unknown;
+        let errorMsg: string;
+
         try {
-          errorData = (await response.json()) as MentionAPIError;
-        } catch {
-          const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-          logError("Mention API request failed", { requestId, endpoint, status: response.status });
+          rawErrorData = await response.json();
+          logError("API response error", {
+            requestId,
+            endpoint,
+            status: response.status,
+            statusText: response.statusText,
+            responseBody: rawErrorData,
+          });
+        } catch (parseError) {
+          errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+          logError("Mention API request failed - could not parse error response", {
+            requestId,
+            endpoint,
+            status: response.status,
+            statusText: response.statusText,
+            parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          });
           throw new McpError(ErrorCode.InternalError, errorMsg);
         }
 
-        const errorMsg = `Mention API Error: ${errorData.error.message}${
-          errorData.error.details ? ` - ${errorData.error.details}` : ""
-        }`;
-        logError("Mention API error", errorData.error, { requestId, endpoint });
+        // Try to extract error message from the response
+        if (rawErrorData && typeof rawErrorData === "object" && "error" in rawErrorData) {
+          const errorData = rawErrorData as MentionAPIError;
+          if (errorData.error?.message) {
+            errorMsg = `Mention API Error: ${errorData.error.message}${
+              errorData.error.details ? ` - ${errorData.error.details}` : ""
+            }`;
+          } else {
+            errorMsg = `HTTP ${response.status}: ${response.statusText} - ${JSON.stringify(rawErrorData)}`;
+          }
+        } else {
+          errorMsg = `HTTP ${response.status}: ${response.statusText} - ${JSON.stringify(rawErrorData)}`;
+        }
 
         if (response.status === 401) {
           throw new McpError(ErrorCode.InvalidRequest, "Invalid API key");
         }
         if (response.status === 403) {
-          throw new McpError(ErrorCode.InvalidRequest, "Access denied - check subscription plan");
+          throw new McpError(ErrorCode.InvalidRequest, "Access denied");
         }
         if (response.status === 429) {
           throw new McpError(
