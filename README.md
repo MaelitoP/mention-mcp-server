@@ -20,6 +20,7 @@ A production-ready [Model Context Protocol (MCP)](https://modelcontextprotocol.i
 | `pause_alert` | Temporarily pause monitoring for specific alerts |
 | `unpause_alert` | Resume monitoring for paused alerts |
 | `fetch_mentions` | Retrieve mentions with advanced filtering |
+| `fetch_alert_stats` | Get comprehensive statistics for alerts |
 
 ## Installation & Usage
 

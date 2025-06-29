@@ -6,9 +6,7 @@
   "bin": {
     "mention-mcp-server": "dist/index.js"
   },
-  "files": [
-    "dist/**/*"
-  ],
+  "files": ["dist/**/*"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -27,13 +25,7 @@
     "version:minor": "npm version minor",
     "version:major": "npm version major"
   },
-  "keywords": [
-    "mcp",
-    "mention",
-    "monitoring",
-    "api",
-    "agorapulse"
-  ],
+  "keywords": ["mcp", "mention", "monitoring", "api", "agorapulse"],
   "author": "MaelitoP",
   "license": "MIT",
   "description": "MCP server for the Mention API to monitor web and social media",

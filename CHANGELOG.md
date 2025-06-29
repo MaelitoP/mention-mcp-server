@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-06-29
+
+### Added
+- **New Tool**: `fetch_alert_stats` - Retrieve comprehensive alert statistics
+  - Flexible date range filtering with `from`, `to`, and `timezone` parameters
+  - Aggregation by interval: daily (P1D), weekly (P1W), monthly (P1M)
+  - Multi-dimensional filtering by `tones`, `languages`, `sources`, `countries`, `tags`
+  - Statistical analysis with `favorite`, `important`, and author influence filtering
+  - Geographic insights with configurable `country_stats` (top N countries)
+  - Temporal analysis with `week_day_stats` and `week_day_by_hour_stats`
+  - Influencer tracking and reach metrics per interval
+
 ## [1.3.0] - 2025-06-28
 
 ### Added
