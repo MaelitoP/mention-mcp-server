@@ -26,7 +26,7 @@ describe("Tools", () => {
     it("should return all tool definitions", () => {
       const tools = getToolDefinitions();
 
-      expect(tools).toHaveLength(10);
+      expect(tools).toHaveLength(11);
       expect(tools.map((t) => t.name)).toEqual([
         "get_account_info",
         "get_app_data",
@@ -38,6 +38,7 @@ describe("Tools", () => {
         "pause_alert",
         "unpause_alert",
         "fetch_mentions",
+        "fetch_alert_stats",
       ]);
     });
 
@@ -267,6 +268,120 @@ describe("Tools", () => {
 
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
           "/accounts/test-account/alerts/alert-789/mentions"
+        );
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+    });
+
+    describe("handleFetchAlertStats", () => {
+      it("should fetch stats for single alert with basic parameters", async () => {
+        const statsArgs = {
+          alerts: ["alert-123"],
+          from: "2024-01-01T00:00:00.0",
+          to: "2024-01-31T23:59:59.0",
+          interval: "P1D" as const,
+        };
+
+        const mockResponse = {
+          stats: {
+            "alert-123": {
+              mentions_per_interval: {
+                avg: 250,
+                max: 400,
+                min: 150,
+                total: 1750,
+                data: {
+                  "2024-01-01": 400,
+                  "2024-01-02": 300,
+                },
+              },
+              alert_id: "alert-123",
+            },
+          },
+          from: "2024-01-01T00:00:00.0+00:00",
+          to: "2024-01-31T23:59:59.0+00:00",
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/stats?alerts%5B%5D=alert-123&from=2024-01-01T00%3A00%3A00.0&to=2024-01-31T23%3A59%3A59.0&interval=P1D"
+        );
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it("should fetch stats for multiple alerts with complex filters", async () => {
+        const statsArgs = {
+          alerts: ["alert-456", "alert-789"],
+          timezone: "Europe/Berlin",
+          tones: [-1, 0, 1],
+          languages: ["en", "fr"],
+          sources: ["twitter", "web"],
+          countries: ["US", "FR"],
+          country_stats: 15,
+          influencers: true,
+          week_day_stats: true,
+        };
+
+        const mockResponse = {
+          stats: {
+            "alert-456": { alert_id: "alert-456" },
+            "alert-789": { alert_id: "alert-789" },
+          },
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
+
+        const expectedUrl =
+          "/accounts/test-account/stats?alerts%5B%5D=alert-456&alerts%5B%5D=alert-789&timezone=Europe%2FBerlin&week_day_stats=true&influencers=true&tones%5B%5D=-1&tones%5B%5D=0&tones%5B%5D=1&languages%5B%5D=en&languages%5B%5D=fr&sources%5B%5D=twitter&sources%5B%5D=web&countries%5B%5D=US&countries%5B%5D=FR&country_stats=15";
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it("should handle boolean country_stats parameter", async () => {
+        const statsArgs = {
+          alerts: ["alert-123"],
+          country_stats: true,
+        };
+
+        const mockResponse = {
+          stats: { "alert-123": { alert_id: "alert-123" } },
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/stats?alerts%5B%5D=alert-123&country_stats=10"
+        );
+        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it("should handle author influence score filter", async () => {
+        const statsArgs = {
+          alerts: ["alert-123"],
+          "author_influence.score": "50:100",
+        };
+
+        const mockResponse = {
+          stats: { "alert-123": { alert_id: "alert-123" } },
+        };
+
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+
+        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/stats?alerts%5B%5D=alert-123&author_influence.score=50%3A100"
         );
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });

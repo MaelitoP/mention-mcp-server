@@ -5,6 +5,7 @@ import type { ToolHandler } from "./base.js";
 
 import { createAdvancedAlertTool } from "./create_advanced_alert.js";
 import { createBasicAlertTool } from "./create_basic_alert.js";
+import { fetchAlertStatsTool } from "./fetch_alert_stats.js";
 import { fetchMentionsTool } from "./fetch_mentions.js";
 import { getAccountInfoTool } from "./get_account_info.js";
 import { getAlertTool } from "./get_alert.js";
@@ -25,6 +26,7 @@ const tools = [
   pauseAlertTool,
   unpauseAlertTool,
   fetchMentionsTool,
+  fetchAlertStatsTool,
 ];
 
 export function getToolDefinitions() {

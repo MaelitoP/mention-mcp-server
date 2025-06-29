@@ -266,6 +266,63 @@ export const FetchMentionsArgsSchema = z.object({
   cursor: z.string().optional().describe("Pagination cursor for navigating results"),
 });
 
+export const FetchAlertStatsArgsSchema = z.object({
+  alerts: z
+    .array(z.string())
+    .min(1)
+    .describe("One or more alert IDs to fetch statistics for (required)"),
+  from: z.string().optional().describe("Start date for statistics (ISO8601 format, inclusive)"),
+  to: z.string().optional().describe("End date for statistics (ISO8601 format, inclusive)"),
+  timezone: z
+    .string()
+    .optional()
+    .describe("Timezone used for from/to dates (e.g., 'Europe/Berlin', 'UTC')"),
+  interval: z
+    .enum(["P1D", "P1W", "P1M"])
+    .optional()
+    .describe("Aggregation interval: P1D (daily), P1W (weekly), P1M (monthly)"),
+  favorite: z.boolean().optional().describe("Only include statistics based on favorite mentions"),
+  important: z.boolean().optional().describe("Only include statistics based on important mentions"),
+  tones: z
+    .array(z.number().int().min(-1).max(1))
+    .optional()
+    .describe("Filter stats by tone: -1 (negative), 0 (neutral), 1 (positive)"),
+  languages: z.array(z.string()).optional().describe("Filter stats by language codes"),
+  sources: z
+    .array(z.string())
+    .optional()
+    .describe("Filter stats by source types (e.g., 'twitter', 'web', 'news')"),
+  countries: z
+    .array(z.string().length(2))
+    .optional()
+    .describe("Filter stats by country ISO codes (2-letter format)"),
+  tags: z.array(z.string()).optional().describe("Filter stats by specific tags"),
+  week_day_stats: z
+    .boolean()
+    .optional()
+    .describe("Group stats by week day (cannot be combined with week_day_by_hour_stats)"),
+  week_day_by_hour_stats: z
+    .boolean()
+    .optional()
+    .describe("Group stats by hour per weekday (cannot be combined with week_day_stats)"),
+  country_stats: z
+    .union([z.boolean(), z.number().int().min(0).max(100)])
+    .optional()
+    .describe("Return top N countries"),
+  influencers: z.boolean().optional().describe("Include top 10 influencers per alert"),
+  reach_per_interval_stats: z
+    .boolean()
+    .optional()
+    .describe("Include direct, cumulative, and domain reach per interval"),
+  "author_influence.score": z
+    .string()
+    .regex(/^(\d+)?:(\d+)?$/)
+    .optional()
+    .describe(
+      "Filter by author influence score range. Format: 'min:max' (e.g., '50:100', ':90', '30:')"
+    ),
+});
+
 export interface MentionAPIError {
   error: {
     code: number;
@@ -285,3 +342,4 @@ export type PauseAlertArgs = z.infer<typeof PauseAlertArgsSchema>;
 export type UnpauseAlertArgs = z.infer<typeof UnpauseAlertArgsSchema>;
 export type BuildBooleanQueryPromptArgs = z.infer<typeof BuildBooleanQueryPromptArgsSchema>;
 export type FetchMentionsArgs = z.infer<typeof FetchMentionsArgsSchema>;
+export type FetchAlertStatsArgs = z.infer<typeof FetchAlertStatsArgsSchema>;
