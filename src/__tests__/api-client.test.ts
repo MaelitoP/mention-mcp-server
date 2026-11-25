@@ -69,14 +69,131 @@ describe("MentionAPIClient", () => {
       );
     });
 
-    it("should handle 403 error properly", async () => {
+    const syntaxError = (line: number, column: number) => ({
+      message: `Syntax error, unexpected EOF on line ${line}, column ${column}`,
+      level: "error",
+      bounds: [
+        {
+          from: { row: line - 1, column: column - 1, column_utf16: column - 1 },
+          to: { row: line - 1, column: column - 1, column_utf16: column - 1 },
+        },
+      ],
+    });
+    const planReason = "Your plan has no statistics access";
+
+    it.each([
+      {
+        label: "a 403 with an error field",
+        status: 403,
+        body: { error: planReason },
+        error: new McpError(ErrorCode.InvalidRequest, `Access denied: ${planReason}`),
+      },
+      {
+        label: "a 403 with a message field",
+        status: 403,
+        body: { code: 403, message: planReason },
+        error: new McpError(ErrorCode.InvalidRequest, `Access denied: ${planReason}`),
+      },
+      {
+        label: "a 403 without a reason",
+        status: 403,
+        body: {},
+        error: new McpError(ErrorCode.InvalidRequest, "Access denied"),
+      },
+      {
+        label: "a 400 with a field error",
+        status: 400,
+        body: {
+          form: {
+            children: {
+              alerts: { children: [[]] },
+              from: { errors: ["This value is not valid."] },
+              to: [],
+            },
+          },
+        },
+        error: new McpError(
+          ErrorCode.InternalError,
+          "Mention API Error (HTTP 400): from: This value is not valid."
+        ),
+      },
+      {
+        label: "a 400 with a form error",
+        status: 400,
+        body: {
+          form: {
+            errors: ["This form should not contain extra fields."],
+            children: { alerts: { children: [[]] }, from: [], to: [] },
+          },
+        },
+        error: new McpError(
+          ErrorCode.InternalError,
+          "Mention API Error (HTTP 400): This form should not contain extra fields."
+        ),
+      },
+      {
+        label: "a 400 with nested field errors",
+        status: 400,
+        body: {
+          form: {
+            children: {
+              name: [],
+              query: {
+                children: {
+                  type: { errors: ["Query type can not be changed"] },
+                  required_keywords: { errors: ["One keyword min."] },
+                },
+              },
+            },
+          },
+          max_alerts_reached: false,
+          boolean_errors: [],
+        },
+        error: new McpError(
+          ErrorCode.InternalError,
+          "Mention API Error (HTTP 400): query.type: Query type can not be changed\nquery.required_keywords: One keyword min."
+        ),
+      },
+      {
+        label: "a 400 with Boolean query errors and a field error",
+        status: 400,
+        body: {
+          form: {
+            children: {
+              name: { errors: ["This value should not be blank."] },
+              query: {
+                children: {
+                  type: [],
+                  query_string: {
+                    errors: ["Syntax error, unexpected EOF on line 1, column 18"],
+                  },
+                },
+              },
+            },
+          },
+          max_alerts_reached: false,
+          boolean_errors: [syntaxError(1, 18), syntaxError(2, 5)],
+        },
+        error: new McpError(
+          ErrorCode.InternalError,
+          "Mention API Error (HTTP 400): Syntax error, unexpected EOF on line 1, column 18 (at line 1, column 18)\nSyntax error, unexpected EOF on line 2, column 5 (at line 2, column 5)\nname: This value should not be blank."
+        ),
+      },
+      {
+        label: "a 500 without a known reason",
+        status: 500,
+        body: { foo: 1 },
+        error: new McpError(ErrorCode.InternalError, 'HTTP 500: Internal Server Error - {"foo":1}'),
+      },
+    ])("should describe $label", async ({ status, body, error }) => {
       mockFetch.mockResolvedValue(
-        Response.json({ error: { code: 403, message: "Forbidden" } }, { status: 403 })
+        Response.json(body, {
+          status,
+          statusText: status === 500 ? "Internal Server Error" : "",
+        })
       );
 
-      await expect(client.makeRequest("/test")).rejects.toThrow(
-        new McpError(ErrorCode.InvalidRequest, "Access denied")
-      );
+      await expect(client.makeRequest("/test")).rejects.toThrow(error);
     });
 
     it("should handle 429 rate limit error properly", async () => {
