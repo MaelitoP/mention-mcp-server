@@ -58,6 +58,12 @@ describe("Tools", () => {
       expect(fetchMentions?.inputSchema).toHaveProperty("properties.tone");
       expect(fetchMentions?.inputSchema).not.toHaveProperty("properties.languages");
     });
+
+    it("should not expose noise_detection on any tool", () => {
+      for (const tool of getToolDefinitions()) {
+        expect(tool.inputSchema).not.toHaveProperty("properties.noise_detection");
+      }
+    });
   });
 
   describe("ToolHandlers", () => {
@@ -199,6 +205,51 @@ describe("Tools", () => {
         });
         expect(result.content[0].text).toBe("new-alert");
       });
+    });
+
+    describe("handleUpdateAlert", () => {
+      it.each([
+        { field: "included_keywords", value: ["nasa"], type: "basic" },
+        { field: "required_keywords", value: ["mars"], type: "basic" },
+        { field: "excluded_keywords", value: ["spam"], type: "basic" },
+        { field: "query_string", value: "nasa AND mars", type: "advanced" },
+      ])("should send a $type query when only $field is passed", async ({ field, value, type }) => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
+
+        await toolHandlers.handleTool("update_alert", { alert_id: "alert-123", [field]: value });
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/alerts/alert-123",
+          { method: "PUT", body: JSON.stringify({ query: { type, [field]: value } }) }
+        );
+      });
+
+      it("should send no query when no query field is passed", async () => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
+
+        await toolHandlers.handleTool("update_alert", { alert_id: "alert-123", name: "Renamed" });
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          "/accounts/test-account/alerts/alert-123",
+          { method: "PUT", body: JSON.stringify({ name: "Renamed" }) }
+        );
+      });
+
+      it.each(["included_keywords", "required_keywords", "excluded_keywords"])(
+        "should reject query_string combined with %s",
+        async (field) => {
+          await expect(
+            toolHandlers.handleTool("update_alert", {
+              alert_id: "alert-123",
+              query_string: "nasa AND mars",
+              [field]: ["nasa"],
+            })
+          ).rejects.toThrow(/query_string cannot be combined/);
+          expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+        }
+      );
     });
 
     describe("handleFetchMentions", () => {

@@ -102,7 +102,6 @@ export const CreateBasicAlertArgsSchema = z.object({
     .array(z.string())
     .optional()
     .describe("An array of blocked sites from which you don't want mentions to be tracked."),
-  noise_detection: z.boolean().default(false).optional(),
 });
 
 export const CreateAdvancedAlertArgsSchema = z.object({
@@ -142,45 +141,60 @@ export const CreateAdvancedAlertArgsSchema = z.object({
     .array(z.string())
     .optional()
     .describe("An array of blocked sites from which you don't want mentions to be tracked."),
-  noise_detection: z.boolean().default(false).optional(),
 });
 
-export const UpdateAlertArgsSchema = z.object({
-  alert_id: z.string().describe("The alert ID to update"),
-  name: z.string().min(1).max(255).optional().describe("New alert name (1-255 characters)"),
-  description: z
-    .string()
-    .max(1000)
-    .optional()
-    .describe("New alert description (max 1000 characters)"),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .optional()
-    .describe("New alert color code"),
-  query_type: z.enum(["basic", "advanced"]).optional().describe("Type of query to update"),
-  included_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Keywords to include (for basic queries)"),
-  required_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Required keywords (for basic queries)"),
-  excluded_keywords: z
-    .array(z.string())
-    .optional()
-    .describe("Excluded keywords (for basic queries)"),
-  query_string: z.string().optional().describe("Advanced query string (for advanced queries)"),
-  languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
-  countries: z.array(z.string()).optional().describe("Country codes to monitor"),
-  sources: z
-    .array(z.enum(["twitter", "news", "web", "blogs", "videos", "forums", "images", "facebook"]))
-    .optional()
-    .describe("Sources to monitor"),
-  blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
-  noise_detection: z.boolean().optional().describe("Enable noise detection"),
-});
+export const UpdateAlertArgsSchema = z
+  .object({
+    alert_id: z.string().describe("The alert ID to update"),
+    name: z.string().min(1).max(255).optional().describe("New alert name (1-255 characters)"),
+    description: z
+      .string()
+      .max(1000)
+      .optional()
+      .describe("New alert description (max 1000 characters)"),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional()
+      .describe("New alert color code"),
+    included_keywords: z
+      .array(z.string())
+      .optional()
+      .describe("Keywords to include (for basic queries)"),
+    required_keywords: z
+      .array(z.string())
+      .optional()
+      .describe("Required keywords (for basic queries)"),
+    excluded_keywords: z
+      .array(z.string())
+      .optional()
+      .describe("Excluded keywords (for basic queries)"),
+    query_string: z
+      .string()
+      .optional()
+      .describe(
+        "Advanced query string (for advanced queries). Cannot be combined with included_keywords, required_keywords or excluded_keywords."
+      ),
+    languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
+    countries: z.array(z.string()).optional().describe("Country codes to monitor"),
+    sources: z
+      .array(z.string())
+      .optional()
+      .describe("Sources to monitor. List available sources using get_app_data tool."),
+    blocked_sites: z.array(z.string()).optional().describe("Domains to exclude from monitoring"),
+  })
+  .refine(
+    (args) =>
+      args.query_string === undefined ||
+      (args.included_keywords === undefined &&
+        args.required_keywords === undefined &&
+        args.excluded_keywords === undefined),
+    {
+      message:
+        "query_string cannot be combined with included_keywords, required_keywords or excluded_keywords",
+      path: ["query_string"],
+    }
+  );
 
 export const PauseAlertArgsSchema = z.object({
   alert_id: z.string().describe("The alert ID to pause"),

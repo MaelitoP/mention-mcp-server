@@ -62,7 +62,6 @@ describe("Schema Validation", () => {
         countries: ["US", "FR"],
         sources: ["twitter", "news"],
         blocked_sites: ["spam.com"],
-        noise_detection: false,
       };
       expect(() => CreateBasicAlertArgsSchema.parse(valid)).not.toThrow();
     });
@@ -134,7 +133,6 @@ describe("Schema Validation", () => {
       const valid = {
         alert_id: "alert-123",
         name: "Updated Alert",
-        query_type: "basic" as const,
         included_keywords: ["updated"],
       };
       expect(() => UpdateAlertArgsSchema.parse(valid)).not.toThrow();
@@ -145,6 +143,11 @@ describe("Schema Validation", () => {
         name: "Updated Alert",
       };
       expect(() => UpdateAlertArgsSchema.parse(invalid)).toThrow();
+    });
+
+    it("should accept any source code", () => {
+      const valid = { alert_id: "alert-123", sources: ["instagram"] };
+      expect(UpdateAlertArgsSchema.parse(valid)).toEqual(valid);
     });
   });
 
