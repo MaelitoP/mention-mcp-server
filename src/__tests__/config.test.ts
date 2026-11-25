@@ -21,7 +21,6 @@ describe("Config", () => {
     expect(config.apiBaseUrl).toBe("https://web.mention.com/api");
     expect(config.logLevel).toBe("info");
     expect(config.requestTimeout).toBe(30000);
-    expect(config.maxRetries).toBe(3);
   });
 
   it("should throw error when API key is missing", () => {
@@ -35,24 +34,34 @@ describe("Config", () => {
     process.env.MENTION_API_BASE_URL = "https://custom.api.com";
     process.env.MCP_LOG_LEVEL = "debug";
     process.env.MCP_REQUEST_TIMEOUT = "60000";
-    process.env.MCP_MAX_RETRIES = "5";
 
     const config = loadConfig();
 
     expect(config.apiBaseUrl).toBe("https://custom.api.com");
     expect(config.logLevel).toBe("debug");
     expect(config.requestTimeout).toBe(60000);
-    expect(config.maxRetries).toBe(5);
   });
 
-  it("should handle invalid number values gracefully", () => {
+  it.each([
+    { timeout: "", expected: 30000 },
+    { timeout: "1", expected: 1 },
+    { timeout: "2147483647", expected: 2147483647 },
+  ])("should accept MCP_REQUEST_TIMEOUT=$timeout", ({ timeout, expected }) => {
     process.env.MENTION_API_KEY = "test-api-key";
-    process.env.MCP_REQUEST_TIMEOUT = "invalid";
-    process.env.MCP_MAX_RETRIES = "not-a-number";
+    process.env.MCP_REQUEST_TIMEOUT = timeout;
 
-    const config = loadConfig();
-
-    expect(config.requestTimeout).toBe(Number.NaN);
-    expect(config.maxRetries).toBe(Number.NaN);
+    expect(loadConfig().requestTimeout).toBe(expected);
   });
+
+  it.each(["abc", "30s", "0", "-1", "1.5", "2147483648"])(
+    "should reject MCP_REQUEST_TIMEOUT=%s",
+    (timeout) => {
+      process.env.MENTION_API_KEY = "test-api-key";
+      process.env.MCP_REQUEST_TIMEOUT = timeout;
+
+      expect(() => loadConfig()).toThrow(
+        `MCP_REQUEST_TIMEOUT must be a whole number of milliseconds between 1 and 2147483647, got "${timeout}"`
+      );
+    }
+  );
 });
