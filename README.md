@@ -69,7 +69,7 @@ npm test
 # Build for production
 npm run build
 
-# Run linting and type checking
+# Run linting, build and tests
 npm run ci
 ```
 
