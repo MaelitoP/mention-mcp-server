@@ -4,7 +4,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@maelitop/mention-mcp-server.svg)](https://www.npmjs.com/package/@maelitop/mention-mcp-server)
 [![NPM Downloads](https://img.shields.io/npm/dm/@maelitop/mention-mcp-server.svg)](https://www.npmjs.com/package/@MaelitoP/mention-mcp-server)
 
-A production-ready [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server for social listening and monitoring through the Mention API. Built with TypeScript, comprehensive error handling, structured logging, and modular architecture.
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server for social listening and monitoring through the Mention API. Built with TypeScript, comprehensive error handling, structured logging, and modular architecture.
 
 ## Supported Tools
 
@@ -35,7 +35,7 @@ Add the following to your Claude Desktop configuration file:
       "command": "npx",
       "args": ["-y", "@maelitop/mention-mcp-server"],
       "env": {
-        "MCP_MENTION_API_KEY": "your_mention_api_key_here"
+        "MENTION_API_KEY": "your_mention_api_key_here"
       }
     }
   }
@@ -46,8 +46,8 @@ Add the following to your Claude Desktop configuration file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MCP_MENTION_API_KEY` | Your Mention API key (required) | - |
-| `MCP_MENTION_API_BASE_URL` | Custom API base URL | `https://web.mention.com/api` |
+| `MENTION_API_KEY` | Your Mention API key (required) | - |
+| `MENTION_API_BASE_URL` | Custom API base URL | `https://web.mention.com/api` |
 | `MCP_LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
 | `MCP_CONSOLE_LOGGING` | Enable console logging (`true`/`false`) | `false` |
 | `MCP_REQUEST_TIMEOUT` | Request timeout in milliseconds | `30000` |
