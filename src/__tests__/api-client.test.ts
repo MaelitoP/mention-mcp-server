@@ -43,6 +43,7 @@ describe("MentionAPIClient", () => {
             Authorization: "Bearer test-api-key",
             "Content-Type": "application/json",
             "User-Agent": "mention-mcp-server/1.2.3",
+            "Accept-Version": "1.21",
           }),
         })
       );
