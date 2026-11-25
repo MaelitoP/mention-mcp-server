@@ -19,7 +19,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) s
 | `update_alert` | Modify existing alert criteria and settings |
 | `pause_alert` | Temporarily pause monitoring for specific alerts |
 | `unpause_alert` | Resume monitoring for paused alerts |
-| `fetch_mentions` | Retrieve mentions with advanced filtering |
+| `search_mentions` | Search an alert's mentions, returned as compact records with a next-page token |
 | `fetch_alert_stats` | Get comprehensive statistics for alerts |
 
 ## Installation & Usage
@@ -50,7 +50,7 @@ Add the following to your Claude Desktop configuration file:
 | `MENTION_API_BASE_URL` | Custom API base URL | `https://web.mention.com/api` |
 | `MCP_LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
 | `MCP_REQUEST_TIMEOUT` | Request timeout in milliseconds, a whole number from `1` to `2147483647` | `30000` |
-| `MENTION_READ_ONLY` | `true` registers only the read-only tools (`get_account_info`, `get_app_data`, `list_alerts`, `get_alert`, `fetch_mentions`, `fetch_alert_stats`), so alerts cannot be created, updated, paused or unpaused; `false`, an empty value or leaving it unset registers every tool. Any other value stops the server at startup | `false` |
+| `MENTION_READ_ONLY` | `true` registers only the read-only tools (`get_account_info`, `get_app_data`, `list_alerts`, `get_alert`, `search_mentions`, `fetch_alert_stats`), so alerts cannot be created, updated, paused or unpaused; `false`, an empty value or leaving it unset registers every tool. Any other value stops the server at startup | `false` |
 
 
 ### Development

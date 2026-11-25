@@ -85,7 +85,7 @@ describe("MCP server", () => {
         "update_alert",
         "pause_alert",
         "unpause_alert",
-        "fetch_mentions",
+        "search_mentions",
         "fetch_alert_stats",
       ]);
     });
@@ -110,17 +110,36 @@ describe("MCP server", () => {
         update_alert: ["Update Alert", write(true, true)],
         pause_alert: ["Pause Alert", write(false, true)],
         unpause_alert: ["Unpause Alert", write(false, true)],
-        fetch_mentions: ["Fetch Mentions", read],
+        search_mentions: ["Search Mentions", read],
         fetch_alert_stats: ["Fetch Alert Stats", read],
       });
     });
 
-    it("should not expose a languages filter on fetch_mentions", async () => {
+    it("should list the search_mentions parameters with limit defaulting to 20", async () => {
       const { tools } = await client.listTools();
-      const fetchMentions = tools.find((t) => t.name === "fetch_mentions");
+      const searchMentions = tools.find((t) => t.name === "search_mentions");
 
-      expect(fetchMentions?.inputSchema).toHaveProperty("properties.tone");
-      expect(fetchMentions?.inputSchema).not.toHaveProperty("properties.languages");
+      expect(Object.keys(searchMentions?.inputSchema.properties ?? {})).toEqual([
+        "alert_id",
+        "from",
+        "to",
+        "tone",
+        "source",
+        "countries",
+        "folder",
+        "unread",
+        "favorite",
+        "q",
+        "tag",
+        "sort",
+        "limit",
+        "next_page",
+      ]);
+      expect(searchMentions?.inputSchema).toHaveProperty("required", ["alert_id"]);
+      expect(searchMentions?.inputSchema).toHaveProperty(
+        "properties.limit",
+        expect.objectContaining({ default: 20, maximum: 100 })
+      );
     });
 
     it("should not expose noise_detection on any tool", async () => {
@@ -435,64 +454,418 @@ describe("MCP server", () => {
     );
   });
 
-  describe("fetch_mentions", () => {
-    it("should fetch mentions with basic parameters", async () => {
-      const mockResponse = {
-        mentions: [
-          { id: "mention-1", content: "Test mention 1" },
-          { id: "mention-2", content: "Test mention 2" },
+  describe("search_mentions", () => {
+    const articleMention = {
+      id: "5001",
+      alert_id: 101,
+      title: "Example Corp opens a new office",
+      description: "Example Corp announced on Monday that it opens a new office in Lyon.",
+      description_short: "Example Corp opens a new office",
+      original_url: "https://news.example.com/example-corp-office",
+      clickable_url: "https://news.example.com/example-corp-office",
+      published_at: "2026-11-24T09:00:00.0+00:00",
+      country: "FR",
+      folder: "inbox",
+      read: false,
+      tone: 1,
+      source_type: "news",
+      source_name: "Example News",
+      language_code: "fr",
+      domain_reach: 120000,
+      author_influence: { id: "a1", kind: "web", name: "Example Author", score: 60 },
+      tags: [{ id: "t1", name: "expansion", mention_count: 3, keywords: [] }],
+      children: { children: [], total: 2 },
+      offsets: { title: [0, 12] },
+    };
+    const tweetMention = {
+      id: "5002",
+      alert_id: 101,
+      published_at: "2026-11-24T08:00:00.0+00:00",
+      country: "US",
+      folder: "inbox",
+      read: true,
+      tone: 0,
+      source_type: "twitter",
+      language_code: "en",
+      direct_reach: 1500,
+      cumulative_reach: 4200,
+      tags: [],
+      children: { children: [], total: 0 },
+      metadata: { twitter: { id_str: "1234567890", user: { id_str: "42" } } },
+    };
+    const forumMention = {
+      id: "5003",
+      published_at: "2026-11-24T07:00:00.0+00:00",
+      source_type: "forums",
+      title: "Example Corp office thread",
+      tone: 0,
+      domain_reach: 800,
+      tags: [],
+      children: { children: [], total: 0 },
+    };
+    const secondTweetMention = {
+      ...tweetMention,
+      id: "5004",
+      published_at: "2026-11-24T06:00:00.0+00:00",
+      tone: -1,
+      direct_reach: 30,
+    };
+
+    const pageOf = (result: Awaited<ReturnType<typeof callTool>>) =>
+      JSON.parse((result.content as { text: string }[]).at(-1)?.text ?? "") as {
+        mentions: { id: string }[];
+        next_page?: string;
+      };
+
+    async function followPages(first: { alert_id: string; limit: number; sort?: string }) {
+      const results = [];
+      let args: Record<string, unknown> = first;
+      for (let call = 0; call < 20; call++) {
+        const result = await callTool("search_mentions", args);
+        results.push(result);
+        const { next_page } = pageOf(result);
+        if (next_page === undefined) {
+          return results;
+        }
+        args = { alert_id: first.alert_id, limit: first.limit, next_page };
+      }
+      throw new Error("next_page never ran out");
+    }
+
+    function fakeMentions(count: number) {
+      return Array.from({ length: count }, (_, i) => ({
+        id: `m${i}`,
+        published_at: `2026-11-${20 - i}T00:00:00.0+00:00`,
+        source_type: "web",
+        title: `Title ${i}`,
+        description: `Text ${i}`,
+        direct_reach: (i * 3) % count,
+      }));
+    }
+
+    function fakeMentionsApi(all: ReturnType<typeof fakeMentions>) {
+      return (endpoint: string) => {
+        const query = new URL(endpoint, "http://localhost").searchParams;
+        const sort = query.get("sort");
+        const limit = Number(query.get("limit"));
+        const beforeDate = query.get("before_date");
+        const sorted =
+          sort === null || sort === "published_at"
+            ? all
+            : [...all].sort((a, b) => b.direct_reach - a.direct_reach);
+        const mentions = sorted
+          .filter((mention) => beforeDate === null || mention.published_at < beforeDate)
+          .slice(0, limit);
+        const more = new URLSearchParams({ limit: String(limit) });
+        more.set("before_date", mentions.at(-1)?.published_at ?? "");
+        if (sort !== null) more.set("sort", sort);
+        return {
+          mentions,
+          _links:
+            mentions.length === limit
+              ? { more: { href: `/api/accounts/test-account/alerts/alert-1/mentions?${more}` } }
+              : {},
+        };
+      };
+    }
+
+    it("should return compact mentions and say which have no text", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({
+        mentions: [articleMention, tweetMention, forumMention, secondTweetMention],
+      });
+
+      const result = await callTool("search_mentions", { alert_id: "alert-1" });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "The Mention API does not provide the title or text of 2 of these mentions (twitter).",
+          },
+          {
+            type: "text",
+            text: JSON.stringify({
+              mentions: [
+                {
+                  id: "5001",
+                  published_at: "2026-11-24T09:00:00.0+00:00",
+                  source: "news",
+                  title: "Example Corp opens a new office",
+                  text: "Example Corp announced on Monday that it opens a new office in Lyon.",
+                  url: "https://news.example.com/example-corp-office",
+                  tone: 1,
+                  reach: 120000,
+                  author: "Example Author",
+                  country: "FR",
+                  tags: ["expansion"],
+                  children: 2,
+                },
+                {
+                  id: "5002",
+                  published_at: "2026-11-24T08:00:00.0+00:00",
+                  source: "twitter",
+                  tone: 0,
+                  reach: 1500,
+                  country: "US",
+                },
+                {
+                  id: "5003",
+                  published_at: "2026-11-24T07:00:00.0+00:00",
+                  source: "forums",
+                  title: "Example Corp office thread",
+                  tone: 0,
+                  reach: 800,
+                },
+                {
+                  id: "5004",
+                  published_at: "2026-11-24T06:00:00.0+00:00",
+                  source: "twitter",
+                  tone: -1,
+                  reach: 30,
+                  country: "US",
+                },
+              ],
+            }),
+          },
         ],
-        _links: {
-          more: { href: "https://api.mention.net/api/.../mentions?cursor=older" },
-          pull: { href: "https://api.mention.net/api/.../mentions?cursor=newer" },
+      });
+    });
+
+    it("should say when the plan has no search access", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({ mentions: [], search_access_denied: true });
+
+      const result = await callTool("search_mentions", {
+        alert_id: "alert-1",
+        sort: "direct_reach",
+      });
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: "text",
+            text: "The Mention API returned no mentions because the account's plan has no search access, which sort, source, q and tag need.",
+          },
+          { type: "text", text: JSON.stringify({ mentions: [] }) },
+        ],
+      });
+    });
+
+    it.each([
+      { args: {}, query: [["limit", "20"]] },
+      { args: { unread: false, favorite: false }, query: [["limit", "20"]] },
+      {
+        args: { tone: [-1, 1], countries: ["FR", "DE"] },
+        query: [
+          ["tone[]", "-1"],
+          ["tone[]", "1"],
+          ["countries[]", "FR"],
+          ["countries[]", "DE"],
+          ["limit", "20"],
+        ],
+      },
+      {
+        args: {
+          from: "2026-11-01T08:00:00+01:00",
+          to: "2026-11-30",
+          source: "news",
+          sort: "published_at",
+          limit: 50,
         },
-      };
-      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+        query: [
+          ["before_date", "2026-12-01T00:00:00.000Z"],
+          ["not_before_date", "2026-11-01T08:00:00+01:00"],
+          ["source", "news"],
+          ["sort", "published_at"],
+          ["limit", "50"],
+        ],
+      },
+      {
+        args: { favorite: true, folder: "archive" },
+        query: [
+          ["folder", "archive"],
+          ["favorite", "true"],
+          ["limit", "20"],
+        ],
+      },
+      {
+        args: { unread: true, folder: "inbox" },
+        query: [
+          ["folder", "inbox"],
+          ["unread", "true"],
+          ["limit", "20"],
+        ],
+      },
+      {
+        args: { tag: 'say "hi"' },
+        query: [
+          ["q", 'tags:"say \\"hi\\""'],
+          ["limit", "20"],
+        ],
+      },
+      {
+        args: { q: "language:en", tag: "launch day" },
+        query: [
+          ["q", '(language:en) AND tags:"launch day"'],
+          ["limit", "20"],
+        ],
+      },
+    ])("should send $args as $query", async ({ args, query }) => {
+      mockApiClient.makeRequest.mockResolvedValue({ mentions: [] });
 
-      const result = await callTool("fetch_mentions", {
-        alert_id: "alert-123",
-        limit: 10,
-        folder: "inbox",
-      });
+      await callTool("search_mentions", { alert_id: "alert-1", ...args });
 
       expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-        "/accounts/test-account/alerts/alert-123/mentions?limit=10&folder=inbox"
+        `/accounts/test-account/alerts/alert-1/mentions?${new URLSearchParams(query)}`
       );
-      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
     });
 
-    it("should fetch mentions with complex filters", async () => {
-      const mockResponse = {
-        mentions: [{ id: "mention-1", content: "Twitter mention" }],
-        _links: {},
-      };
-      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
-
-      const result = await callTool("fetch_mentions", {
-        alert_id: "alert-456",
-        limit: 50,
-        source: "twitter",
-        tone: [-1, 1],
-        countries: ["FR", "DE"],
-        unread: true,
+    it("should end the range at the current time when only from is given", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      onTestFinished(() => {
+        vi.useRealTimers();
       });
+      vi.setSystemTime(new Date("2026-11-25T12:00:00.000Z"));
+      mockApiClient.makeRequest.mockResolvedValue({ mentions: [] });
+
+      await callTool("search_mentions", { alert_id: "alert-1", from: "2026-11-01" });
 
       expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-        "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone%5B%5D=-1&tone%5B%5D=1&countries%5B%5D=FR&countries%5B%5D=DE"
+        `/accounts/test-account/alerts/alert-1/mentions?${new URLSearchParams({
+          before_date: "2026-11-25T12:00:00.000Z",
+          not_before_date: "2026-11-01T00:00:00.000Z",
+          limit: "20",
+        })}`
       );
-      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
     });
 
-    it("should fetch mentions with no parameters", async () => {
-      const mockResponse = { mentions: [], _links: {} };
-      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+    it("should reject a date-time without Z or an offset", async () => {
+      const result = await callTool("search_mentions", {
+        alert_id: "alert-1",
+        from: "2026-11-01T08:00:00",
+      });
 
-      const result = await callTool("fetch_mentions", { alert_id: "alert-789" });
+      expect(result).toEqual(errorResult(/Expected a date .* at from$/));
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+    });
 
-      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-        "/accounts/test-account/alerts/alert-789/mentions"
+    it.each([
+      [{ unread: true, favorite: true }, "unread cannot be combined with favorite"],
+      [{ unread: true, q: "language:en" }, "unread cannot be combined with q"],
+      [{ unread: true, tag: "launch" }, "unread cannot be combined with tag"],
+      [{ unread: true, tone: [1] }, "unread cannot be combined with tone"],
+      [{ favorite: true, tone: [1] }, "favorite cannot be combined with tone"],
+      [{ favorite: true, folder: "spam" }, "favorite cannot be combined with folder spam"],
+      [{ tone: [-1], folder: "trash" }, "tone cannot be combined with folder trash"],
+      [{ tone: [0], q: "language:en" }, "tone cannot be combined with q"],
+      [{ tone: [0], tag: "launch" }, "tone cannot be combined with tag"],
+      [{ next_page: "token", sort: "direct_reach" }, "next_page cannot be combined with sort"],
+    ])("should reject %j", async (args, message) => {
+      const result = await callTool("search_mentions", { alert_id: "alert-1", ...args });
+
+      expect(result).toEqual(errorResult(message));
+      expect(mockApiClient.getAccountId).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      "not-a-token",
+      Buffer.from(JSON.stringify({ query: "", offset: -1 })).toString("base64url"),
+    ])("should reject the next_page %j it did not return", async (next_page) => {
+      const result = await callTool("search_mentions", { alert_id: "alert-1", next_page });
+
+      expect(result).toEqual(errorResult("next_page is not a token returned by search_mentions"));
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { sort: undefined, limits: ["2", "2", "2"] },
+      { sort: "published_at", limits: ["2", "2", "2"] },
+      { sort: "author_influence.score", limits: ["2", "4", "6"] },
+      { sort: "direct_reach", limits: ["2", "4", "6"] },
+      { sort: "cumulative_reach", limits: ["2", "4", "6"] },
+      { sort: "domain_reach", limits: ["2", "4", "6"] },
+    ])(
+      "should return each mention once by following next_page with sort $sort",
+      async ({ sort, limits }) => {
+        const api = fakeMentionsApi(fakeMentions(5));
+        const expected = api(`?limit=5${sort ? `&sort=${sort}` : ""}`).mentions.map((m) => m.id);
+        mockApiClient.makeRequest.mockImplementation(async (endpoint) => api(endpoint));
+
+        const results = await followPages({ alert_id: "alert-1", limit: 2, sort });
+
+        expect(results.flatMap((result) => pageOf(result).mentions.map((m) => m.id))).toEqual(
+          expected
+        );
+        expect(
+          mockApiClient.makeRequest.mock.calls.map(([endpoint]) =>
+            new URL(endpoint, "http://localhost").searchParams.get("limit")
+          )
+        ).toEqual(limits);
+      }
+    );
+
+    it("should not let a mention published after the first page shift a reach order", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      onTestFinished(() => {
+        vi.useRealTimers();
+      });
+      vi.setSystemTime(new Date("2026-11-21T00:00:00.000Z"));
+      const mentions = fakeMentions(5);
+      const api = fakeMentionsApi(mentions);
+      const expected = api("?limit=5&sort=direct_reach").mentions.map((m) => m.id);
+      mockApiClient.makeRequest.mockImplementation(async (endpoint) => api(endpoint));
+      mockApiClient.makeRequest.mockImplementationOnce(async (endpoint) => {
+        const response = api(endpoint);
+        mentions.push({
+          ...mentions[0],
+          id: "late",
+          published_at: "2026-11-22T00:00:00.0+00:00",
+          direct_reach: 100,
+        });
+        return response;
+      });
+
+      const results = await followPages({ alert_id: "alert-1", limit: 2, sort: "direct_reach" });
+
+      expect(results.flatMap((result) => pageOf(result).mentions.map((m) => m.id))).toEqual(
+        expected
       );
-      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
+
+    it("should stop next_page at the first 1000 mentions in a reach order and say so", async () => {
+      mockApiClient.makeRequest.mockImplementation(async (endpoint) => {
+        const limit = Number(new URL(endpoint, "http://localhost").searchParams.get("limit"));
+        return {
+          mentions: Array.from({ length: limit }, (_, i) => ({
+            id: `m${i}`,
+            title: "Title",
+            description: "Text",
+          })),
+        };
+      });
+
+      const results = await followPages({ alert_id: "alert-1", limit: 100, sort: "direct_reach" });
+
+      expect(
+        mockApiClient.makeRequest.mock.calls.map(([endpoint]) =>
+          new URL(endpoint, "http://localhost").searchParams.get("limit")
+        )
+      ).toEqual(["100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"]);
+      expect(results.at(-1)?.content).toEqual([
+        {
+          type: "text",
+          text: "This order pages through the first 1000 mentions only; narrow the search with from and to to reach the others.",
+        },
+        {
+          type: "text",
+          text: JSON.stringify({
+            mentions: Array.from({ length: 100 }, (_, i) => ({
+              id: `m${900 + i}`,
+              title: "Title",
+              text: "Text",
+            })),
+          }),
+        },
+      ]);
     });
   });
 
@@ -645,8 +1018,8 @@ describe("MCP server", () => {
         path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/unpause",
       },
       {
-        tool: "fetch_mentions",
-        path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/mentions",
+        tool: "search_mentions",
+        path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/mentions?limit=20",
       },
     ])("$tool should keep the alert_id in a single path segment", async ({ tool, path }) => {
       mockApiClient.makeRequest.mockResolvedValue({});
