@@ -1,7 +1,7 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { Config } from "./config.js";
 import { logDebug, logError } from "./logger.js";
-import type { AccountResponse, MentionAPIError } from "./types.js";
+import type { AccountResponse } from "./types.js";
 import { AccountResponseSchema } from "./types.js";
 
 export function apiPath(strings: TemplateStringsArray, ...segments: string[]): string {
@@ -11,6 +11,75 @@ export function apiPath(strings: TemplateStringsArray, ...segments: string[]): s
     }
   }
   return String.raw({ raw: strings }, ...segments.map(encodeURIComponent));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function formErrors(node: unknown, path = ""): string[] {
+  if (!isRecord(node)) {
+    return [];
+  }
+  const own = Array.isArray(node.errors)
+    ? node.errors.map((message: unknown) =>
+        path ? `${path}: ${asText(message)}` : asText(message)
+      )
+    : [];
+  const children = isRecord(node.children)
+    ? Object.entries(node.children).flatMap(([name, child]) =>
+        formErrors(child, path ? `${path}.${name}` : name)
+      )
+    : [];
+  return [...own, ...children];
+}
+
+function formatBooleanError(error: unknown): string {
+  if (!isRecord(error) || typeof error.message !== "string") {
+    return asText(error);
+  }
+  const bounds: unknown[] = Array.isArray(error.bounds) ? error.bounds : [];
+  const positions = bounds.flatMap((bound) =>
+    isRecord(bound) &&
+    isRecord(bound.from) &&
+    typeof bound.from.row === "number" &&
+    typeof bound.from.column === "number"
+      ? [`line ${bound.from.row + 1}, column ${bound.from.column + 1}`]
+      : []
+  );
+  return positions.length > 0 ? `${error.message} (at ${positions.join("; ")})` : error.message;
+}
+
+function errorReason(body: unknown): string | undefined {
+  if (!isRecord(body)) {
+    return undefined;
+  }
+  const booleanErrors = Array.isArray(body.boolean_errors)
+    ? body.boolean_errors.map(formatBooleanError)
+    : [];
+  const formLines = formErrors(body.form).filter(
+    (line) => booleanErrors.length === 0 || !line.startsWith("query.query_string: ")
+  );
+  const lines = [...booleanErrors, ...formLines];
+  if (lines.length > 0) {
+    return lines.join("\n");
+  }
+  if (typeof body.message === "string") {
+    return body.message;
+  }
+  if (typeof body.error === "string") {
+    return body.error;
+  }
+  if (isRecord(body.error) && typeof body.error.message === "string") {
+    return typeof body.error.details === "string"
+      ? `${body.error.message} - ${body.error.details}`
+      : body.error.message;
+  }
+  return undefined;
 }
 
 export class MentionAPIClient {
@@ -46,7 +115,6 @@ export class MentionAPIClient {
 
       if (!response.ok) {
         let rawErrorData: unknown;
-        let errorMsg: string;
 
         try {
           rawErrorData = await response.json();
@@ -58,7 +126,6 @@ export class MentionAPIClient {
             responseBody: rawErrorData,
           });
         } catch (parseError) {
-          errorMsg = `HTTP ${response.status}: ${response.statusText}`;
           logError("Mention API request failed - could not parse error response", {
             requestId,
             endpoint,
@@ -66,28 +133,21 @@ export class MentionAPIClient {
             statusText: response.statusText,
             parseError: parseError instanceof Error ? parseError.message : String(parseError),
           });
-          throw new McpError(ErrorCode.InternalError, errorMsg);
-        }
-
-        // Try to extract error message from the response
-        if (rawErrorData && typeof rawErrorData === "object" && "error" in rawErrorData) {
-          const errorData = rawErrorData as MentionAPIError;
-          if (errorData.error?.message) {
-            errorMsg = `Mention API Error: ${errorData.error.message}${
-              errorData.error.details ? ` - ${errorData.error.details}` : ""
-            }`;
-          } else {
-            errorMsg = `HTTP ${response.status}: ${response.statusText} - ${JSON.stringify(rawErrorData)}`;
-          }
-        } else {
-          errorMsg = `HTTP ${response.status}: ${response.statusText} - ${JSON.stringify(rawErrorData)}`;
+          throw new McpError(
+            ErrorCode.InternalError,
+            `HTTP ${response.status}: ${response.statusText}`
+          );
         }
 
         if (response.status === 401) {
           throw new McpError(ErrorCode.InvalidRequest, "Invalid API key");
         }
+        const reason = errorReason(rawErrorData);
         if (response.status === 403) {
-          throw new McpError(ErrorCode.InvalidRequest, "Access denied");
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            reason ? `Access denied: ${reason}` : "Access denied"
+          );
         }
         if (response.status === 429) {
           throw new McpError(
@@ -96,7 +156,12 @@ export class MentionAPIClient {
           );
         }
 
-        throw new McpError(ErrorCode.InternalError, errorMsg);
+        throw new McpError(
+          ErrorCode.InternalError,
+          reason
+            ? `Mention API Error (HTTP ${response.status}): ${reason}`
+            : `HTTP ${response.status}: ${response.statusText} - ${JSON.stringify(rawErrorData)}`
+        );
       }
 
       const responseText = await response.text();

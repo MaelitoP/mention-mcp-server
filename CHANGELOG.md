@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `zod-to-json-schema` dependency
 - Log lines for each tool call (started, completed, failed); failed API requests are still logged
 
+### Fixed
+- A 403 keeps the reason the API gives, such as a plan without access to a feature, after "Access denied" instead of dropping it
+- A 400 or other API error whose body carries a message shows that message and the HTTP status instead of the raw response body: form errors become one `field: message` line each, and an invalid Boolean query in `create_advanced_alert` lists each error with its line and column, one per line, instead of generic tips and an example query. A 401 and a 429 keep their fixed messages
+
 ## [1.4.1] - 2026-11-25
 
 ### Fixed

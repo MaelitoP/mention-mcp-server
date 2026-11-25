@@ -186,7 +186,7 @@ describe("MCP server", () => {
 
       const result = await realClient.callTool({ name: "get_account_info", arguments: {} });
 
-      expect(result).toEqual(errorResult(/Mention API Error: Invalid alert/));
+      expect(result).toEqual(errorResult(/Mention API Error \(HTTP 400\): Invalid alert$/));
     });
 
     it("should return an unknown tool as an error result", async () => {
@@ -351,24 +351,6 @@ describe("MCP server", () => {
         }),
       });
       expect(result).toEqual(textResult("new-alert"));
-    });
-
-    it("should explain a boolean query the API rejects", async () => {
-      mockApiClient.makeRequest.mockRejectedValue(
-        new Error('HTTP 400: Bad Request - {"boolean_errors":["Unbalanced parentheses"]}')
-      );
-
-      const result = await callTool("create_advanced_alert", {
-        group_id: "group-123",
-        name: "Advanced Alert",
-        query_string: "((NASA",
-        languages: ["en"],
-        sources: ["web"],
-      });
-
-      expect(result).toEqual(
-        errorResult(/^Boolean query validation failed\.[\s\S]*Unbalanced parentheses/)
-      );
     });
   });
 

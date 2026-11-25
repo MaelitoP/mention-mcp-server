@@ -333,14 +333,6 @@ export const FetchAlertStatsArgsSchema = z.object({
     ),
 });
 
-export interface MentionAPIError {
-  error: {
-    code: number;
-    message: string;
-    details?: string;
-  };
-}
-
 export type AccountResponse = z.infer<typeof AccountResponseSchema>;
 export type AppDataResponse = z.infer<typeof AppDataResponseSchema>;
 export type ListAlertsArgs = z.infer<typeof ListAlertsArgsSchema>;
