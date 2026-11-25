@@ -21,6 +21,7 @@ describe("MentionAPIClient", () => {
       apiBaseUrl: "https://api.test.com",
       logLevel: "info",
       requestTimeout: 5000,
+      readOnly: false,
     };
     client = new MentionAPIClient(config, "1.2.3");
     mockFetch.mockReset();

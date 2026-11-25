@@ -3,6 +3,7 @@ export interface Config {
   apiBaseUrl: string;
   logLevel: string;
   requestTimeout: number;
+  readOnly: boolean;
 }
 
 // AbortSignal.timeout uses Node timers, which fire after 1 ms above a signed 32-bit delay.
@@ -18,6 +19,13 @@ function parseRequestTimeout(value: string): number {
   return timeout;
 }
 
+function parseReadOnly(value: string): boolean {
+  if (value !== "true" && value !== "false") {
+    throw new Error(`MENTION_READ_ONLY must be "true" or "false", got "${value}"`);
+  }
+  return value === "true";
+}
+
 export function loadConfig(): Config {
   const apiKey = process.env.MENTION_API_KEY;
   if (!apiKey) {
@@ -29,5 +37,6 @@ export function loadConfig(): Config {
     apiBaseUrl: process.env.MENTION_API_BASE_URL || "https://web.mention.com/api",
     logLevel: process.env.MCP_LOG_LEVEL || "info",
     requestTimeout: parseRequestTimeout(process.env.MCP_REQUEST_TIMEOUT || "30000"),
+    readOnly: parseReadOnly(process.env.MENTION_READ_ONLY || "false"),
   };
 }

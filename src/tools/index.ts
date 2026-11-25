@@ -12,16 +12,18 @@ import { registerPauseAlertTool } from "./pause_alert.js";
 import { registerUnpauseAlertTool } from "./unpause_alert.js";
 import { registerUpdateAlertTool } from "./update_alert.js";
 
-export function registerTools(server: McpServer, apiClient: MentionAPIClient) {
+export function registerTools(server: McpServer, apiClient: MentionAPIClient, readOnly: boolean) {
   registerGetAccountInfoTool(server, apiClient);
   registerGetAppDataTool(server, apiClient);
   registerListAlertsTool(server, apiClient);
   registerGetAlertTool(server, apiClient);
-  registerCreateBasicAlertTool(server, apiClient);
-  registerCreateAdvancedAlertTool(server, apiClient);
-  registerUpdateAlertTool(server, apiClient);
-  registerPauseAlertTool(server, apiClient);
-  registerUnpauseAlertTool(server, apiClient);
+  if (!readOnly) {
+    registerCreateBasicAlertTool(server, apiClient);
+    registerCreateAdvancedAlertTool(server, apiClient);
+    registerUpdateAlertTool(server, apiClient);
+    registerPauseAlertTool(server, apiClient);
+    registerUnpauseAlertTool(server, apiClient);
+  }
   registerFetchMentionsTool(server, apiClient);
   registerFetchAlertStatsTool(server, apiClient);
 }

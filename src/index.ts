@@ -29,7 +29,10 @@ async function main() {
     logInfo("Starting MCP server");
 
     const version = getPackageVersion();
-    const server = createServer(new MentionAPIClient(loadConfig(), version), version);
+    const config = loadConfig();
+    const server = createServer(new MentionAPIClient(config, version), version, {
+      readOnly: config.readOnly,
+    });
     const transport = new StdioServerTransport();
 
     await server.connect(transport);

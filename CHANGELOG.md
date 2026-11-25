@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Every tool has a `title` and `annotations`: the read tools are marked `readOnlyHint`, `pause_alert` and `unpause_alert` `idempotentHint`, and `update_alert` `destructiveHint`, so clients no longer have to treat every tool as destructive
 - The server returns `instructions` at initialisation; the advice to call `get_account_info` first moved there from that tool's description, which now lists what the tool returns
+- `MENTION_READ_ONLY=true` registers only the read-only tools, so the model cannot create, update, pause or unpause alerts; `false`, an empty value or leaving it unset keeps every tool, and any other value stops the server at startup with an error naming the variable
 
 ### Changed
 - `@modelcontextprotocol/sdk` upgraded from 1.12 to 1.32; the server now accepts MCP protocol version `2025-11-25`
