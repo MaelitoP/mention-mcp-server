@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `search_mentions` takes a `tag` filter: the name of a tag listed in a mention's `tags`
+
+### Changed
+- **Breaking:** `fetch_mentions` is renamed `search_mentions` and returns compact JSON instead of the raw API payload: `id`, `published_at`, `source`, `title`, `text`, `url`, `tone`, `reach`, `author`, `country`, `tags` and `children` per mention, leaving out fields that are missing, empty or zero, so a page of 20 mentions takes under 3k tokens instead of up to about 22k
+- **Breaking:** `search_mentions` takes `from` and `to` instead of `before_date` and `not_before_date`, and `next_page` instead of `cursor`. A date in `to` includes that whole day in UTC, as in `fetch_alert_stats`; `since_id`, `include_children` and `timezone` are removed. `limit` goes from 1 to 100 and is 20 when omitted, where an omitted `limit` used to leave the page size to the API
+- `search_mentions` returns a `next_page` token that leads to the following page in every sort order; following the API's own link skipped or repeated mentions in every order but `published_at`
+- `search_mentions` rejects a combination of filters the API refuses or ignores, such as `unread` with `favorite` or `tone` with `q`, with a message naming both parameters, and sends `unread` and `favorite` only when they are `true`, since the API rejects `false`
+- `search_mentions` says in a sentence when the plan has no search access, which `sort`, `source`, `q` and `tag` need, and how many mentions come without a title or text
+
 ## [1.5.0] - 2026-11-25
 
 ### Added

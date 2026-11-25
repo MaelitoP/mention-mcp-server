@@ -205,55 +205,80 @@ export const BuildBooleanQueryPromptArgsSchema = z.object({
     ),
 });
 
-export const FetchMentionsArgsSchema = z.object({
-  alert_id: z.string().describe("The alert ID to fetch mentions from"),
-  since_id: z
-    .number()
+function mentionsDateTime(dayOffsetIfDateOnly: 0 | 1) {
+  return z
+    .string()
+    .regex(
+      /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/,
+      "Expected a date (2026-11-01) or a date-time with Z or an offset (2026-11-01T08:00:00+01:00)"
+    )
+    .transform((value) =>
+      value.length === 10
+        ? new Date(Date.parse(value) + dayOffsetIfDateOnly * 86_400_000).toISOString()
+        : value
+    );
+}
+
+export const SearchMentionsArgsSchema = z.object({
+  alert_id: z.string().describe("The alert ID whose mentions to search"),
+  from: mentionsDateTime(0)
     .optional()
     .describe(
-      "Return mentions with ID greater than this value. Cannot be used with before_date, not_before_date, or cursor."
+      "First day to include (2026-11-01, from 00:00 UTC), or a date-time with Z or an offset (2026-11-01T08:00:00+01:00) at or after which mentions were published"
     ),
-  before_date: z
-    .string()
+  to: mentionsDateTime(1)
     .optional()
-    .describe("Return mentions published before this datetime (ISO8601 format)"),
-  not_before_date: z
+    .describe(
+      "Last day to include (2026-11-30, until 24:00 UTC), or a date-time with Z or an offset before which mentions were published"
+    ),
+  tone: z
+    .array(z.number().int().min(-1).max(1))
+    .optional()
+    .describe(
+      "Only mentions with one of these tones: -1 negative, 0 neutral, 1 positive. Cannot be combined with unread, favorite, q, tag, or folder spam or trash; with q or tag, add tone:negative, tone:neutral or tone:positive to q instead."
+    ),
+  source: z
     .string()
     .optional()
     .describe(
-      "Ignore mentions older than this date (ISO8601 format). Must be used with before_date."
+      "Only mentions from this source, e.g. 'twitter', 'news' or 'web'. Needs search access."
     ),
-  limit: z
-    .number()
-    .min(1)
-    .max(1000)
-    .default(20)
+  countries: z
+    .array(z.string().length(2))
     .optional()
-    .describe("Number of mentions to return. Default is 20, max is 1000."),
-  source: z.string().optional().describe("Filter by source"),
+    .describe("Only mentions from these countries (ISO 3166-1 alpha-2 codes)"),
+  folder: z
+    .enum(["inbox", "archive", "spam", "trash"])
+    .optional()
+    .describe(
+      "Only mentions in this folder. spam and trash cannot be combined with favorite or tone."
+    ),
   unread: z
     .boolean()
     .optional()
-    .describe("Return only unread mentions. Cannot be used with favorite, q, or tone."),
+    .describe(
+      "true returns only unread mentions. Cannot be combined with favorite, q, tag or tone."
+    ),
   favorite: z
     .boolean()
     .optional()
     .describe(
-      "Return only favorite mentions. Cannot be used with folder unless it is 'inbox' or 'archive'."
+      "true returns only favorite mentions. Cannot be combined with unread, tone, or folder spam or trash."
     ),
-  folder: z
-    .enum(["inbox", "archive", "spam", "trash"])
+  q: z
+    .string()
+    .min(1)
     .optional()
-    .describe("Filter by folder: inbox, archive, spam, trash"),
-  tone: z
-    .array(z.number().int().min(-1).max(1))
+    .describe(
+      "Search query, e.g. 'tone:(neutral OR positive) language:en' or 'published_at:[2026-11-01 TO 2026-11-30]'. Needs search access. Cannot be combined with unread or tone."
+    ),
+  tag: z
+    .string()
+    .min(1)
     .optional()
-    .describe("Filter by tone: -1 = negative, 0 = neutral, 1 = positive. Multiple values allowed."),
-  countries: z
-    .array(z.string().length(2))
-    .optional()
-    .describe("Filter by country codes (ISO 3166-1 alpha-2). Multiple values allowed."),
-  include_children: z.boolean().optional().describe("Whether to include child mentions"),
+    .describe(
+      "Only mentions with this tag, by the name listed in a mention's tags. Needs search access. Cannot be combined with unread or tone."
+    ),
   sort: z
     .enum([
       "published_at",
@@ -263,10 +288,38 @@ export const FetchMentionsArgsSchema = z.object({
       "domain_reach",
     ])
     .optional()
-    .describe("Sort by field"),
-  timezone: z.string().optional().describe("Timezone for parsing date values in q parameter"),
-  q: z.string().optional().describe("Advanced keyword-based filtering"),
-  cursor: z.string().optional().describe("Pagination cursor for navigating results"),
+    .describe(
+      "Order of the mentions. published_at, the default, lists the newest first; the others list the highest first and page through the first 1000 mentions only. Needs search access."
+    ),
+  limit: z.number().int().min(1).max(100).default(20).describe("Mentions per page, 1-100"),
+  next_page: z
+    .string()
+    .optional()
+    .describe(
+      "The next_page token of a previous result, to get the following page. Pass it with the same alert_id and no parameter other than limit: the token keeps the others."
+    ),
+});
+
+export const MentionsResponseSchema = z.object({
+  mentions: z.array(
+    z.object({
+      id: z.string(),
+      published_at: z.string().nullish(),
+      source_type: z.string().nullish(),
+      title: z.string().nullish(),
+      description: z.string().nullish(),
+      original_url: z.string().nullish(),
+      tone: z.number().nullish(),
+      direct_reach: z.number().nullish(),
+      domain_reach: z.number().nullish(),
+      author_influence: z.object({ name: z.string().nullish() }).nullish(),
+      country: z.string().nullish(),
+      tags: z.array(z.object({ name: z.string() })).nullish(),
+      children: z.object({ total: z.number() }).nullish(),
+    })
+  ),
+  search_access_denied: z.boolean().nullish(),
+  _links: z.object({ more: z.object({ href: z.string() }).nullish() }).nullish(),
 });
 
 // The stats endpoint rejects a Z, an offset, or a date-time without fractional seconds.
@@ -353,5 +406,6 @@ export type UpdateAlertArgs = z.infer<typeof UpdateAlertArgsSchema>;
 export type PauseAlertArgs = z.infer<typeof PauseAlertArgsSchema>;
 export type UnpauseAlertArgs = z.infer<typeof UnpauseAlertArgsSchema>;
 export type BuildBooleanQueryPromptArgs = z.infer<typeof BuildBooleanQueryPromptArgsSchema>;
-export type FetchMentionsArgs = z.infer<typeof FetchMentionsArgsSchema>;
+export type SearchMentionsArgs = z.infer<typeof SearchMentionsArgsSchema>;
+export type MentionsResponse = z.infer<typeof MentionsResponseSchema>;
 export type FetchAlertStatsArgs = z.infer<typeof FetchAlertStatsArgsSchema>;
