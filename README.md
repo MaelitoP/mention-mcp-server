@@ -49,8 +49,7 @@ Add the following to your Claude Desktop configuration file:
 | `MENTION_API_KEY` | Your Mention API key (required) | - |
 | `MENTION_API_BASE_URL` | Custom API base URL | `https://web.mention.com/api` |
 | `MCP_LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
-| `MCP_REQUEST_TIMEOUT` | Request timeout in milliseconds | `30000` |
-| `MCP_MAX_RETRIES` | Maximum retry attempts | `3` |
+| `MCP_REQUEST_TIMEOUT` | Request timeout in milliseconds, a whole number from `1` to `2147483647` | `30000` |
 
 
 ### Development
