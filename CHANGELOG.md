@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-25
+
 ### Fixed
 - README documents `MENTION_API_KEY` and `MENTION_API_BASE_URL`, the variable names the server reads
 - Logs are written as JSON lines to stderr, so a startup failure such as a missing `MENTION_API_KEY` is reported before the process exits and stdout carries only MCP messages
