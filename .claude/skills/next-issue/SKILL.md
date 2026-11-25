@@ -69,6 +69,8 @@ If the `typescript-review` skill is available, run it on the diff before committ
 
 One commit. Its subject must follow Conventional Commits (https://www.conventionalcommits.org): `type(scope): summary`, with `!` before the colon for a breaking change. Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`. Issue titles are already written this way, so use the issue title exactly. The pull request title is the same string.
 
+The commit message is the subject line only: no body, no description, no trailers. The explanation belongs in the pull request.
+
 If you need a further commit on the branch (for example after review feedback), it follows the same format. Never commit with a subject such as "wip", "fixes" or "address review".
 
 ```bash
