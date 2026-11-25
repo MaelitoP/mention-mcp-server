@@ -23,15 +23,14 @@ function createFetchAlertStatsHandler(apiClient: MentionAPIClient): ToolHandler 
         for (const alertId of validated.alerts) {
           searchParams.append("alerts[]", alertId);
         }
+        searchParams.append("from", validated.from);
+        searchParams.append("to", validated.to);
+        searchParams.append("interval", validated.interval);
 
         // Handle optional parameters
         const optionalParams = {
-          from: validated.from,
-          to: validated.to,
           timezone: validated.timezone,
-          interval: validated.interval,
           favorite: validated.favorite,
-          important: validated.important,
           week_day_stats: validated.week_day_stats,
           week_day_by_hour_stats: validated.week_day_by_hour_stats,
           influencers: validated.influencers,

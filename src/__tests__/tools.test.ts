@@ -64,6 +64,17 @@ describe("Tools", () => {
         expect(tool.inputSchema).not.toHaveProperty("properties.noise_detection");
       }
     });
+
+    it("should require from, to and interval on fetch_alert_stats and not expose important", () => {
+      const fetchAlertStats = getToolDefinitions().find((t) => t.name === "fetch_alert_stats");
+
+      expect(fetchAlertStats?.inputSchema).toHaveProperty(
+        "required",
+        expect.arrayContaining(["from", "to", "interval"])
+      );
+      expect(fetchAlertStats?.inputSchema).toHaveProperty("properties.to.pattern");
+      expect(fetchAlertStats?.inputSchema).not.toHaveProperty("properties.important");
+    });
   });
 
   describe("ToolHandlers", () => {
@@ -331,13 +342,15 @@ describe("Tools", () => {
     });
 
     describe("handleFetchAlertStats", () => {
+      const range = {
+        from: "2024-01-01T00:00:00.0",
+        to: "2024-01-31T23:59:59.0",
+        interval: "P1D",
+      };
+      const rangeQuery = "from=2024-01-01T00%3A00%3A00.0&to=2024-01-31T23%3A59%3A59.0&interval=P1D";
+
       it("should fetch stats for single alert with basic parameters", async () => {
-        const statsArgs = {
-          alerts: ["alert-123"],
-          from: "2024-01-01T00:00:00.0",
-          to: "2024-01-31T23:59:59.0",
-          interval: "P1D" as const,
-        };
+        const statsArgs = { alerts: ["alert-123"], ...range };
 
         const mockResponse = {
           stats: {
@@ -365,7 +378,7 @@ describe("Tools", () => {
         const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
 
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/stats?alerts%5B%5D=alert-123&from=2024-01-01T00%3A00%3A00.0&to=2024-01-31T23%3A59%3A59.0&interval=P1D"
+          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}`
         );
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });
@@ -373,6 +386,7 @@ describe("Tools", () => {
       it("should fetch stats for multiple alerts with complex filters", async () => {
         const statsArgs = {
           alerts: ["alert-456", "alert-789"],
+          ...range,
           timezone: "Europe/Berlin",
           tones: [-1, 0, 1],
           languages: ["en", "fr"],
@@ -395,8 +409,7 @@ describe("Tools", () => {
 
         const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
 
-        const expectedUrl =
-          "/accounts/test-account/stats?alerts%5B%5D=alert-456&alerts%5B%5D=alert-789&timezone=Europe%2FBerlin&week_day_stats=true&influencers=true&tones%5B%5D=-1&tones%5B%5D=0&tones%5B%5D=1&languages%5B%5D=en&languages%5B%5D=fr&sources%5B%5D=twitter&sources%5B%5D=web&countries%5B%5D=US&countries%5B%5D=FR&country_stats=15";
+        const expectedUrl = `/accounts/test-account/stats?alerts%5B%5D=alert-456&alerts%5B%5D=alert-789&${rangeQuery}&timezone=Europe%2FBerlin&week_day_stats=true&influencers=true&tones%5B%5D=-1&tones%5B%5D=0&tones%5B%5D=1&languages%5B%5D=en&languages%5B%5D=fr&sources%5B%5D=twitter&sources%5B%5D=web&countries%5B%5D=US&countries%5B%5D=FR&country_stats=15`;
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });
@@ -404,6 +417,7 @@ describe("Tools", () => {
       it("should handle boolean country_stats parameter", async () => {
         const statsArgs = {
           alerts: ["alert-123"],
+          ...range,
           country_stats: true,
         };
 
@@ -417,7 +431,7 @@ describe("Tools", () => {
         const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
 
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/stats?alerts%5B%5D=alert-123&country_stats=10"
+          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}&country_stats=10`
         );
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });
@@ -425,6 +439,7 @@ describe("Tools", () => {
       it("should handle author influence score filter", async () => {
         const statsArgs = {
           alerts: ["alert-123"],
+          ...range,
           "author_influence.score": "50:100",
         };
 
@@ -438,9 +453,49 @@ describe("Tools", () => {
         const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
 
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/stats?alerts%5B%5D=alert-123&author_influence.score=50%3A100"
+          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}&author_influence.score=50%3A100`
         );
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+      });
+
+      it.each([
+        ["2026-11-01", "2026-11-01T00:00:00.0", "2026-11-01T23:59:59.0"],
+        ["2026-11-01T00:00:00Z", "2026-11-01T00:00:00.0", "2026-11-01T00:00:00.0"],
+        ["2026-11-01T08:30:15.123Z", "2026-11-01T08:30:15.0", "2026-11-01T08:30:15.0"],
+      ])("should send %j as from %j and as to %j", async (input, from, to) => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
+
+        await toolHandlers.handleTool("fetch_alert_stats", {
+          alerts: ["alert-123"],
+          from: input,
+          to: input,
+          interval: "P1D",
+        });
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${new URLSearchParams({ from, to, interval: "P1D" })}`
+        );
+      });
+
+      it("should reject a date-time with an offset", async () => {
+        await expect(
+          toolHandlers.handleTool("fetch_alert_stats", {
+            alerts: ["alert-123"],
+            ...range,
+            from: "2026-11-01T00:00:00+01:00",
+          })
+        ).rejects.toMatchObject({ issues: [{ path: ["from"] }] });
+        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+      });
+
+      it.each(["from", "to", "interval"])("should reject a call without %s", async (missing) => {
+        const args = { alerts: ["alert-123"], ...range, [missing]: undefined };
+
+        await expect(toolHandlers.handleTool("fetch_alert_stats", args)).rejects.toMatchObject({
+          issues: [{ path: [missing], code: "invalid_type" }],
+        });
+        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
       });
     });
 
