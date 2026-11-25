@@ -1,64 +1,27 @@
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { MentionAPIClient } from "../api-client.js";
-import { logError, logInfo } from "../logger.js";
-import type { ToolHandler } from "./base.js";
+import { registerCreateAdvancedAlertTool } from "./create_advanced_alert.js";
+import { registerCreateBasicAlertTool } from "./create_basic_alert.js";
+import { registerFetchAlertStatsTool } from "./fetch_alert_stats.js";
+import { registerFetchMentionsTool } from "./fetch_mentions.js";
+import { registerGetAccountInfoTool } from "./get_account_info.js";
+import { registerGetAlertTool } from "./get_alert.js";
+import { registerGetAppDataTool } from "./get_app_data.js";
+import { registerListAlertsTool } from "./list_alerts.js";
+import { registerPauseAlertTool } from "./pause_alert.js";
+import { registerUnpauseAlertTool } from "./unpause_alert.js";
+import { registerUpdateAlertTool } from "./update_alert.js";
 
-import { createAdvancedAlertTool } from "./create_advanced_alert.js";
-import { createBasicAlertTool } from "./create_basic_alert.js";
-import { fetchAlertStatsTool } from "./fetch_alert_stats.js";
-import { fetchMentionsTool } from "./fetch_mentions.js";
-import { getAccountInfoTool } from "./get_account_info.js";
-import { getAlertTool } from "./get_alert.js";
-import { getAppDataTool } from "./get_app_data.js";
-import { listAlertsTool } from "./list_alerts.js";
-import { pauseAlertTool } from "./pause_alert.js";
-import { unpauseAlertTool } from "./unpause_alert.js";
-import { updateAlertTool } from "./update_alert.js";
-
-const tools = [
-  getAccountInfoTool,
-  getAppDataTool,
-  listAlertsTool,
-  getAlertTool,
-  createBasicAlertTool,
-  createAdvancedAlertTool,
-  updateAlertTool,
-  pauseAlertTool,
-  unpauseAlertTool,
-  fetchMentionsTool,
-  fetchAlertStatsTool,
-];
-
-export function getToolDefinitions() {
-  return tools.map((tool) => tool.getDefinition());
-}
-
-export class ToolHandlers {
-  private handlers: Map<string, ToolHandler>;
-
-  constructor(private apiClient: MentionAPIClient) {
-    this.handlers = new Map();
-
-    for (const tool of tools) {
-      const handler = tool.createHandler(apiClient);
-      this.handlers.set(tool.getDefinition().name, handler);
-    }
-  }
-
-  async handleTool(name: string, args: unknown) {
-    const handler = this.handlers.get(name);
-    if (!handler) {
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-    }
-
-    logInfo("Tool call started", { tool: name });
-    try {
-      const result = await handler.handle(args);
-      logInfo("Tool call completed", { tool: name });
-      return result;
-    } catch (error) {
-      logError("Tool call failed", error, { tool: name, args });
-      throw error;
-    }
-  }
+export function registerTools(server: McpServer, apiClient: MentionAPIClient) {
+  registerGetAccountInfoTool(server, apiClient);
+  registerGetAppDataTool(server, apiClient);
+  registerListAlertsTool(server, apiClient);
+  registerGetAlertTool(server, apiClient);
+  registerCreateBasicAlertTool(server, apiClient);
+  registerCreateAdvancedAlertTool(server, apiClient);
+  registerUpdateAlertTool(server, apiClient);
+  registerPauseAlertTool(server, apiClient);
+  registerUnpauseAlertTool(server, apiClient);
+  registerFetchMentionsTool(server, apiClient);
+  registerFetchAlertStatsTool(server, apiClient);
 }

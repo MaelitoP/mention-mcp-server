@@ -1,50 +1,27 @@
-import { zodToJsonSchema } from "zod-to-json-schema";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type MentionAPIClient, apiPath } from "../api-client.js";
-import { logError, logInfo } from "../logger.js";
+import { logInfo } from "../logger.js";
 import { UnpauseAlertArgsSchema } from "../types.js";
-import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
 
-function createUnpauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
-  return {
-    async handle(args: unknown): Promise<{
-      content: Array<{
-        type: string;
-        text: string;
-      }>;
-    }> {
-      try {
-        const { alert_id } = UnpauseAlertArgsSchema.parse(args);
-        const accountId = await apiClient.getAccountId();
-
-        await apiClient.makeRequest(apiPath`/accounts/${accountId}/alerts/${alert_id}/unpause`, {
-          method: "POST",
-        });
-
-        logInfo("Alert unpaused", { accountId, alertId: alert_id });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Alert ${alert_id} unpaused.`,
-            },
-          ],
-        };
-      } catch (error) {
-        logError("Failed to unpause alert", error);
-        throw error;
-      }
-    },
-  };
-}
-
-export const unpauseAlertTool: Tool = {
-  getDefinition(): ToolDefinition {
-    return {
-      name: "unpause_alert",
+export function registerUnpauseAlertTool(server: McpServer, apiClient: MentionAPIClient) {
+  server.registerTool(
+    "unpause_alert",
+    {
       description: "Resume monitoring for a previously paused alert.",
-      inputSchema: zodToJsonSchema(UnpauseAlertArgsSchema),
-    };
-  },
-  createHandler: createUnpauseAlertHandler,
-};
+      inputSchema: UnpauseAlertArgsSchema.shape,
+    },
+    async ({ alert_id }) => {
+      const accountId = await apiClient.getAccountId();
+
+      await apiClient.makeRequest(apiPath`/accounts/${accountId}/alerts/${alert_id}/unpause`, {
+        method: "POST",
+      });
+
+      logInfo("Alert unpaused", { accountId, alertId: alert_id });
+
+      return {
+        content: [{ type: "text", text: `Alert ${alert_id} unpaused.` }],
+      };
+    }
+  );
+}

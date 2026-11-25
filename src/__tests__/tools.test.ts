@@ -1,32 +1,76 @@
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { type MockedFunction, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MentionAPIClient } from "../api-client.js";
-import { ToolHandlers, getToolDefinitions } from "../tools/index.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
+import { type Mock, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { MentionAPIClient } from "../api-client.js";
+import { createServer } from "../server.js";
 
-// Mock logger
 vi.mock("../logger.js", () => ({
   logError: vi.fn(),
   logInfo: vi.fn(),
+  logDebug: vi.fn(),
 }));
 
-describe("Tools", () => {
-  let toolHandlers: ToolHandlers;
-  let mockApiClient: Partial<MentionAPIClient>;
+async function connect(apiClient: MentionAPIClient) {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test-client", version: "1.0.0" });
+  await Promise.all([
+    createServer(apiClient, "1.0.0").connect(serverTransport),
+    client.connect(clientTransport),
+  ]);
+  return client;
+}
 
-  beforeEach(() => {
+function textResult(text: string) {
+  return { content: [{ type: "text", text }] };
+}
+
+function errorResult(text: string | RegExp) {
+  return {
+    content: [
+      { type: "text", text: typeof text === "string" ? text : expect.stringMatching(text) },
+    ],
+    isError: true,
+  };
+}
+
+describe("MCP server", () => {
+  let client: Client;
+  let mockApiClient: {
+    getAccountInfo: Mock<MentionAPIClient["getAccountInfo"]>;
+    getAccountId: Mock<MentionAPIClient["getAccountId"]>;
+    makeRequest: Mock<MentionAPIClient["makeRequest"]>;
+  };
+
+  const callTool = (name: string, args: Record<string, unknown>) =>
+    client.callTool({ name, arguments: args });
+
+  beforeEach(async () => {
     mockApiClient = {
       getAccountInfo: vi.fn(),
-      getAccountId: vi.fn(),
+      getAccountId: vi.fn(async () => "test-account"),
       makeRequest: vi.fn(),
     };
-    toolHandlers = new ToolHandlers(mockApiClient as MentionAPIClient);
+    client = await connect(mockApiClient as unknown as MentionAPIClient);
   });
 
-  describe("getToolDefinitions", () => {
-    it("should return all tool definitions", () => {
-      const tools = getToolDefinitions();
+  afterEach(async () => {
+    await client.close();
+    vi.unstubAllGlobals();
+  });
 
-      expect(tools).toHaveLength(11);
+  it("should advertise tools and prompts but not resources", () => {
+    const capabilities = client.getServerCapabilities();
+
+    expect(capabilities).toHaveProperty("tools");
+    expect(capabilities).toHaveProperty("prompts");
+    expect(capabilities).not.toHaveProperty("resources");
+  });
+
+  describe("tools/list", () => {
+    it("should list all tools", async () => {
+      const { tools } = await client.listTools();
+
       expect(tools.map((t) => t.name)).toEqual([
         "get_account_info",
         "get_app_data",
@@ -42,31 +86,25 @@ describe("Tools", () => {
       ]);
     });
 
-    it("should have proper schemas for all tools", () => {
-      const tools = getToolDefinitions();
-
-      for (const tool of tools) {
-        expect(tool.inputSchema).toBeDefined();
-        expect(tool.description).toBeDefined();
-        expect(typeof tool.description).toBe("string");
-      }
-    });
-
-    it("should not expose a languages filter on fetch_mentions", () => {
-      const fetchMentions = getToolDefinitions().find((t) => t.name === "fetch_mentions");
+    it("should not expose a languages filter on fetch_mentions", async () => {
+      const { tools } = await client.listTools();
+      const fetchMentions = tools.find((t) => t.name === "fetch_mentions");
 
       expect(fetchMentions?.inputSchema).toHaveProperty("properties.tone");
       expect(fetchMentions?.inputSchema).not.toHaveProperty("properties.languages");
     });
 
-    it("should not expose noise_detection on any tool", () => {
-      for (const tool of getToolDefinitions()) {
+    it("should not expose noise_detection on any tool", async () => {
+      const { tools } = await client.listTools();
+
+      for (const tool of tools) {
         expect(tool.inputSchema).not.toHaveProperty("properties.noise_detection");
       }
     });
 
-    it("should require from, to and interval on fetch_alert_stats and not expose important", () => {
-      const fetchAlertStats = getToolDefinitions().find((t) => t.name === "fetch_alert_stats");
+    it("should require from, to and interval on fetch_alert_stats and not expose important", async () => {
+      const { tools } = await client.listTools();
+      const fetchAlertStats = tools.find((t) => t.name === "fetch_alert_stats");
 
       expect(fetchAlertStats?.inputSchema).toHaveProperty(
         "required",
@@ -75,490 +113,546 @@ describe("Tools", () => {
       expect(fetchAlertStats?.inputSchema).toHaveProperty("properties.to.pattern");
       expect(fetchAlertStats?.inputSchema).not.toHaveProperty("properties.important");
     });
+
+    it("should list both query field kinds on update_alert", async () => {
+      const { tools } = await client.listTools();
+      const updateAlert = tools.find((t) => t.name === "update_alert");
+
+      expect(updateAlert?.inputSchema).toHaveProperty("properties.query_string");
+      expect(updateAlert?.inputSchema).toHaveProperty("properties.included_keywords");
+      expect(updateAlert?.inputSchema).toHaveProperty("required", ["alert_id"]);
+    });
   });
 
-  describe("ToolHandlers", () => {
-    describe("handleGetAccountInfo", () => {
-      it("should return formatted account info", async () => {
-        const mockAccountData = {
-          account: {
-            id: "test-account",
-            subscription: { advanced_query_access: true },
-            groups: [{ id: "group1", name: "Test Group" }],
-          },
-        };
+  describe("tool errors", () => {
+    it("should return a missing required argument as an error result", async () => {
+      const result = await callTool("get_alert", {});
 
-        (mockApiClient.getAccountInfo as MockedFunction<any>).mockResolvedValue(mockAccountData);
-
-        const result = await toolHandlers.handleTool("get_account_info", {});
-
-        expect(result.content).toHaveLength(1);
-        expect(result.content[0].type).toBe("text");
-
-        const responseData = JSON.parse(result.content[0].text);
-        expect(responseData.accountId).toBe("test-account");
-        expect(responseData.canCreateAdvancedAlert).toBe(true);
-        expect(responseData.groups).toHaveLength(1);
-      });
-
-      it("should handle missing groups", async () => {
-        const mockAccountData = {
-          account: {
-            id: "test-account",
-            subscription: { advanced_query_access: false },
-          },
-        };
-
-        (mockApiClient.getAccountInfo as MockedFunction<any>).mockResolvedValue(mockAccountData);
-
-        const result = await toolHandlers.handleTool("get_account_info", {});
-        const responseData = JSON.parse(result.content[0].text);
-
-        expect(responseData.groups).toEqual([]);
-      });
+      expect(result).toEqual(
+        errorResult(/Invalid arguments for tool get_alert: Required at alert_id/)
+      );
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
     });
 
-    describe("handleListAlerts", () => {
-      it("should list alerts with pagination", async () => {
-        const mockAlertsData = {
-          alerts: [{ id: "alert1", name: "Test Alert" }],
-          pagination: { cursor: "next-page" },
-        };
+    it("should return an API 4xx as an error result", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(
+            Response.json({ error: { code: 400, message: "Invalid alert" } }, { status: 400 })
+          )
+      );
+      const apiClient = new MentionAPIClient(
+        {
+          apiKey: "test-api-key",
+          apiBaseUrl: "https://api.test.com",
+          logLevel: "info",
+          requestTimeout: 5000,
+        },
+        "1.0.0"
+      );
+      const realClient = await connect(apiClient);
+      onTestFinished(() => realClient.close());
 
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockAlertsData);
+      const result = await realClient.callTool({ name: "get_account_info", arguments: {} });
 
-        const result = await toolHandlers.handleTool("list_alerts", { limit: 10, cursor: "page1" });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/alerts?limit=10&cursor=page1"
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockAlertsData, null, 2));
-      });
-
-      it("should handle no pagination parameters", async () => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({ alerts: [] });
-
-        await toolHandlers.handleTool("list_alerts", {});
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts");
-      });
+      expect(result).toEqual(errorResult(/Mention API Error: Invalid alert/));
     });
 
-    describe("handleCreateBasicAlert", () => {
-      it("should create basic alert", async () => {
-        const alertArgs = {
-          group_id: "group-123",
-          name: "Test Alert",
-          included_keywords: ["test"],
-          excluded_keywords: ["spam"],
-          languages: ["en"],
-          sources: ["web"],
-        };
+    it("should return an unknown tool as an error result", async () => {
+      expect(await callTool("unknown_tool", {})).toEqual(
+        errorResult(/Tool unknown_tool not found/)
+      );
+    });
+  });
 
-        const mockResponse = { alert: { id: "new-alert" } };
+  describe("get_account_info", () => {
+    it("should return formatted account info", async () => {
+      mockApiClient.getAccountInfo.mockResolvedValue({
+        account: {
+          id: "test-account",
+          subscription: { advanced_query_access: true },
+          groups: [{ id: "group1", name: "Test Group" }],
+        },
+      });
 
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+      const result = await callTool("get_account_info", {});
 
-        const result = await toolHandlers.handleTool("create_basic_alert", alertArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
-          method: "POST",
-          body: JSON.stringify({
-            group_id: "group-123",
-            name: "Test Alert",
-            languages: ["en"],
-            sources: ["web"],
-            query: {
-              type: "basic",
-              included_keywords: ["test"],
-              required_keywords: undefined,
-              excluded_keywords: ["spam"],
-              monitored_website: undefined,
+      expect(result).toEqual(
+        textResult(
+          JSON.stringify(
+            {
+              accountId: "test-account",
+              canCreateAdvancedAlert: true,
+              groups: [{ id: "group1", name: "Test Group" }],
             },
-          }),
-        });
-        expect(result.content[0].text).toBe("new-alert");
-      });
-    });
-
-    describe("handleCreateAdvancedAlert", () => {
-      it("should create advanced alert", async () => {
-        const alertArgs = {
-          group_id: "group-123",
-          name: "Advanced Alert",
-          query_string: "(NASA OR SpaceX) AND mars",
-          languages: ["en"],
-          sources: ["web"],
-        };
-
-        const mockResponse = { alert: { id: "new-alert" } };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("create_advanced_alert", alertArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
-          method: "POST",
-          body: JSON.stringify({
-            group_id: "group-123",
-            name: "Advanced Alert",
-            languages: ["en"],
-            sources: ["web"],
-            query: {
-              type: "advanced",
-              query_string: "(NASA OR SpaceX) AND mars",
-            },
-          }),
-        });
-        expect(result.content[0].text).toBe("new-alert");
-      });
-    });
-
-    describe("handleUpdateAlert", () => {
-      it.each([
-        { field: "included_keywords", value: ["nasa"], type: "basic" },
-        { field: "required_keywords", value: ["mars"], type: "basic" },
-        { field: "excluded_keywords", value: ["spam"], type: "basic" },
-        { field: "query_string", value: "nasa AND mars", type: "advanced" },
-      ])("should send a $type query when only $field is passed", async ({ field, value, type }) => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
-
-        await toolHandlers.handleTool("update_alert", { alert_id: "alert-123", [field]: value });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/alerts/alert-123",
-          { method: "PUT", body: JSON.stringify({ query: { type, [field]: value } }) }
-        );
-      });
-
-      it("should send no query when no query field is passed", async () => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
-
-        await toolHandlers.handleTool("update_alert", { alert_id: "alert-123", name: "Renamed" });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/alerts/alert-123",
-          { method: "PUT", body: JSON.stringify({ name: "Renamed" }) }
-        );
-      });
-
-      it.each(["included_keywords", "required_keywords", "excluded_keywords"])(
-        "should reject query_string combined with %s",
-        async (field) => {
-          await expect(
-            toolHandlers.handleTool("update_alert", {
-              alert_id: "alert-123",
-              query_string: "nasa AND mars",
-              [field]: ["nasa"],
-            })
-          ).rejects.toThrow(/query_string cannot be combined/);
-          expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
-        }
+            null,
+            2
+          )
+        )
       );
     });
 
-    describe("handleFetchMentions", () => {
-      it("should fetch mentions with basic parameters", async () => {
-        const mentionsArgs = {
-          alert_id: "alert-123",
-          limit: 10,
-          folder: "inbox" as const,
-        };
-
-        const mockResponse = {
-          mentions: [
-            { id: "mention-1", content: "Test mention 1" },
-            { id: "mention-2", content: "Test mention 2" },
-          ],
-          _links: {
-            more: { href: "https://api.mention.net/api/.../mentions?cursor=older" },
-            pull: { href: "https://api.mention.net/api/.../mentions?cursor=newer" },
-          },
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/alerts/alert-123/mentions?limit=10&folder=inbox"
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+    it("should handle missing groups", async () => {
+      mockApiClient.getAccountInfo.mockResolvedValue({
+        account: {
+          id: "test-account",
+          subscription: { advanced_query_access: false },
+        },
       });
 
-      it("should fetch mentions with complex filters", async () => {
-        const mentionsArgs = {
-          alert_id: "alert-456",
-          limit: 50,
-          source: "twitter",
-          tone: [-1, 1],
-          countries: ["FR", "DE"],
-          unread: true,
-        };
+      const result = await callTool("get_account_info", {});
 
-        const mockResponse = {
-          mentions: [{ id: "mention-1", content: "Twitter mention" }],
-          _links: {},
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
-
-        const expectedUrl =
-          "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone%5B%5D=-1&tone%5B%5D=1&countries%5B%5D=FR&countries%5B%5D=DE";
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
-      });
-
-      it("should fetch mentions with no parameters", async () => {
-        const mentionsArgs = {
-          alert_id: "alert-789",
-        };
-
-        const mockResponse = {
-          mentions: [],
-          _links: {},
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          "/accounts/test-account/alerts/alert-789/mentions"
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
-      });
+      expect(result).toEqual(
+        textResult(
+          JSON.stringify(
+            { accountId: "test-account", canCreateAdvancedAlert: false, groups: [] },
+            null,
+            2
+          )
+        )
+      );
     });
+  });
 
-    describe("handleFetchAlertStats", () => {
-      const range = {
-        from: "2024-01-01T00:00:00.0",
-        to: "2024-01-31T23:59:59.0",
-        interval: "P1D",
+  describe("get_app_data", () => {
+    it("should return language and country codes and the visible sources", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({
+        alert_languages: { en: { name: "English" } },
+        alert_countries: { FR: "France" },
+        alert_sources: {
+          web: { name: "Web", hidden: false },
+          secret: { name: "Secret", hidden: true },
+        },
+      });
+
+      const result = await callTool("get_app_data", {});
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/app/data");
+      expect(result).toEqual(
+        textResult(
+          JSON.stringify({ languages: ["en"], countries: ["FR"], sources: ["web"] }, null, 2)
+        )
+      );
+    });
+  });
+
+  describe("list_alerts", () => {
+    it("should list alerts with pagination", async () => {
+      const mockAlertsData = {
+        alerts: [{ id: "alert1", name: "Test Alert" }],
+        pagination: { cursor: "next-page" },
       };
-      const rangeQuery = "from=2024-01-01T00%3A00%3A00.0&to=2024-01-31T23%3A59%3A59.0&interval=P1D";
+      mockApiClient.makeRequest.mockResolvedValue(mockAlertsData);
 
-      it("should fetch stats for single alert with basic parameters", async () => {
-        const statsArgs = { alerts: ["alert-123"], ...range };
+      const result = await callTool("list_alerts", { limit: 10, cursor: "page1" });
 
-        const mockResponse = {
-          stats: {
-            "alert-123": {
-              mentions_per_interval: {
-                avg: 250,
-                max: 400,
-                min: 150,
-                total: 1750,
-                data: {
-                  "2024-01-01": 400,
-                  "2024-01-02": 300,
-                },
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts?limit=10&cursor=page1"
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockAlertsData, null, 2)));
+    });
+
+    it("should handle no pagination parameters", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({ alerts: [] });
+
+      await callTool("list_alerts", {});
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts");
+    });
+  });
+
+  describe("create_basic_alert", () => {
+    it("should create basic alert", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({ alert: { id: "new-alert" } });
+
+      const result = await callTool("create_basic_alert", {
+        group_id: "group-123",
+        name: "Test Alert",
+        included_keywords: ["test"],
+        excluded_keywords: ["spam"],
+        languages: ["en"],
+        sources: ["web"],
+      });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
+        method: "POST",
+        body: JSON.stringify({
+          group_id: "group-123",
+          name: "Test Alert",
+          languages: ["en"],
+          sources: ["web"],
+          query: {
+            type: "basic",
+            included_keywords: ["test"],
+            required_keywords: undefined,
+            excluded_keywords: ["spam"],
+            monitored_website: undefined,
+          },
+        }),
+      });
+      expect(result).toEqual(textResult("new-alert"));
+    });
+  });
+
+  describe("create_advanced_alert", () => {
+    it("should create advanced alert", async () => {
+      mockApiClient.makeRequest.mockResolvedValue({ alert: { id: "new-alert" } });
+
+      const result = await callTool("create_advanced_alert", {
+        group_id: "group-123",
+        name: "Advanced Alert",
+        query_string: "(NASA OR SpaceX) AND mars",
+        languages: ["en"],
+        sources: ["web"],
+      });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith("/accounts/test-account/alerts", {
+        method: "POST",
+        body: JSON.stringify({
+          group_id: "group-123",
+          name: "Advanced Alert",
+          languages: ["en"],
+          sources: ["web"],
+          query: {
+            type: "advanced",
+            query_string: "(NASA OR SpaceX) AND mars",
+          },
+        }),
+      });
+      expect(result).toEqual(textResult("new-alert"));
+    });
+
+    it("should explain a boolean query the API rejects", async () => {
+      mockApiClient.makeRequest.mockRejectedValue(
+        new Error('HTTP 400: Bad Request - {"boolean_errors":["Unbalanced parentheses"]}')
+      );
+
+      const result = await callTool("create_advanced_alert", {
+        group_id: "group-123",
+        name: "Advanced Alert",
+        query_string: "((NASA",
+        languages: ["en"],
+        sources: ["web"],
+      });
+
+      expect(result).toEqual(
+        errorResult(/^Boolean query validation failed\.[\s\S]*Unbalanced parentheses/)
+      );
+    });
+  });
+
+  describe("update_alert", () => {
+    it.each([
+      { field: "included_keywords", value: ["nasa"], type: "basic" },
+      { field: "required_keywords", value: ["mars"], type: "basic" },
+      { field: "excluded_keywords", value: ["spam"], type: "basic" },
+      { field: "query_string", value: "nasa AND mars", type: "advanced" },
+    ])("should send a $type query when only $field is passed", async ({ field, value, type }) => {
+      mockApiClient.makeRequest.mockResolvedValue({});
+
+      await callTool("update_alert", { alert_id: "alert-123", [field]: value });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts/alert-123",
+        { method: "PUT", body: JSON.stringify({ query: { type, [field]: value } }) }
+      );
+    });
+
+    it("should send no query when no query field is passed", async () => {
+      const updated = { alert: { id: "alert-123", name: "Renamed" } };
+      mockApiClient.makeRequest.mockResolvedValue(updated);
+
+      const result = await callTool("update_alert", { alert_id: "alert-123", name: "Renamed" });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts/alert-123",
+        { method: "PUT", body: JSON.stringify({ name: "Renamed" }) }
+      );
+      expect(result).toEqual(textResult(JSON.stringify(updated, null, 2)));
+    });
+
+    it.each(["included_keywords", "required_keywords", "excluded_keywords"])(
+      "should reject query_string combined with %s",
+      async (field) => {
+        const result = await callTool("update_alert", {
+          alert_id: "alert-123",
+          query_string: "nasa AND mars",
+          [field]: ["nasa"],
+        });
+
+        expect(result).toEqual(
+          errorResult(
+            "query_string cannot be combined with included_keywords, required_keywords or excluded_keywords"
+          )
+        );
+        expect(mockApiClient.getAccountId).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  describe("fetch_mentions", () => {
+    it("should fetch mentions with basic parameters", async () => {
+      const mockResponse = {
+        mentions: [
+          { id: "mention-1", content: "Test mention 1" },
+          { id: "mention-2", content: "Test mention 2" },
+        ],
+        _links: {
+          more: { href: "https://api.mention.net/api/.../mentions?cursor=older" },
+          pull: { href: "https://api.mention.net/api/.../mentions?cursor=newer" },
+        },
+      };
+      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+
+      const result = await callTool("fetch_mentions", {
+        alert_id: "alert-123",
+        limit: 10,
+        folder: "inbox",
+      });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts/alert-123/mentions?limit=10&folder=inbox"
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
+
+    it("should fetch mentions with complex filters", async () => {
+      const mockResponse = {
+        mentions: [{ id: "mention-1", content: "Twitter mention" }],
+        _links: {},
+      };
+      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+
+      const result = await callTool("fetch_mentions", {
+        alert_id: "alert-456",
+        limit: 50,
+        source: "twitter",
+        tone: [-1, 1],
+        countries: ["FR", "DE"],
+        unread: true,
+      });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone%5B%5D=-1&tone%5B%5D=1&countries%5B%5D=FR&countries%5B%5D=DE"
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
+
+    it("should fetch mentions with no parameters", async () => {
+      const mockResponse = { mentions: [], _links: {} };
+      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+
+      const result = await callTool("fetch_mentions", { alert_id: "alert-789" });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        "/accounts/test-account/alerts/alert-789/mentions"
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
+  });
+
+  describe("fetch_alert_stats", () => {
+    const range = {
+      from: "2024-01-01T00:00:00.0",
+      to: "2024-01-31T23:59:59.0",
+      interval: "P1D",
+    };
+    const rangeQuery = "from=2024-01-01T00%3A00%3A00.0&to=2024-01-31T23%3A59%3A59.0&interval=P1D";
+
+    it("should fetch stats for single alert with basic parameters", async () => {
+      const mockResponse = {
+        stats: {
+          "alert-123": {
+            mentions_per_interval: {
+              avg: 250,
+              max: 400,
+              min: 150,
+              total: 1750,
+              data: {
+                "2024-01-01": 400,
+                "2024-01-02": 300,
               },
-              alert_id: "alert-123",
             },
+            alert_id: "alert-123",
           },
-          from: "2024-01-01T00:00:00.0+00:00",
-          to: "2024-01-31T23:59:59.0+00:00",
-        };
+        },
+        from: "2024-01-01T00:00:00.0+00:00",
+        to: "2024-01-31T23:59:59.0+00:00",
+      };
+      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
 
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
+      const result = await callTool("fetch_alert_stats", { alerts: ["alert-123"], ...range });
 
-        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}`
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
 
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}`
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
+    it("should fetch stats for multiple alerts with complex filters", async () => {
+      const mockResponse = {
+        stats: {
+          "alert-456": { alert_id: "alert-456" },
+          "alert-789": { alert_id: "alert-789" },
+        },
+      };
+      mockApiClient.makeRequest.mockResolvedValue(mockResponse);
+
+      const result = await callTool("fetch_alert_stats", {
+        alerts: ["alert-456", "alert-789"],
+        ...range,
+        timezone: "Europe/Berlin",
+        tones: [-1, 0, 1],
+        languages: ["en", "fr"],
+        sources: ["twitter", "web"],
+        countries: ["US", "FR"],
+        country_stats: 15,
+        influencers: true,
+        week_day_stats: true,
       });
 
-      it("should fetch stats for multiple alerts with complex filters", async () => {
-        const statsArgs = {
-          alerts: ["alert-456", "alert-789"],
-          ...range,
-          timezone: "Europe/Berlin",
-          tones: [-1, 0, 1],
-          languages: ["en", "fr"],
-          sources: ["twitter", "web"],
-          countries: ["US", "FR"],
-          country_stats: 15,
-          influencers: true,
-          week_day_stats: true,
-        };
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        `/accounts/test-account/stats?alerts%5B%5D=alert-456&alerts%5B%5D=alert-789&${rangeQuery}&timezone=Europe%2FBerlin&week_day_stats=true&influencers=true&tones%5B%5D=-1&tones%5B%5D=0&tones%5B%5D=1&languages%5B%5D=en&languages%5B%5D=fr&sources%5B%5D=twitter&sources%5B%5D=web&countries%5B%5D=US&countries%5B%5D=FR&country_stats=15`
+      );
+      expect(result).toEqual(textResult(JSON.stringify(mockResponse, null, 2)));
+    });
 
-        const mockResponse = {
-          stats: {
-            "alert-456": { alert_id: "alert-456" },
-            "alert-789": { alert_id: "alert-789" },
+    it.each([
+      { extra: { country_stats: true }, suffix: "country_stats=10" },
+      { extra: { country_stats: false }, suffix: "country_stats=0" },
+      { extra: { "author_influence.score": "50:100" }, suffix: "author_influence.score=50%3A100" },
+    ])("should send $extra as $suffix", async ({ extra, suffix }) => {
+      mockApiClient.makeRequest.mockResolvedValue({});
+
+      await callTool("fetch_alert_stats", { alerts: ["alert-123"], ...range, ...extra });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}&${suffix}`
+      );
+    });
+
+    it.each([
+      ["2026-11-01", "2026-11-01T00:00:00.0", "2026-11-01T23:59:59.0"],
+      ["2026-11-01T00:00:00Z", "2026-11-01T00:00:00.0", "2026-11-01T00:00:00.0"],
+      ["2026-11-01T08:30:15.123Z", "2026-11-01T08:30:15.0", "2026-11-01T08:30:15.0"],
+    ])("should send %j as from %j and as to %j", async (input, from, to) => {
+      mockApiClient.makeRequest.mockResolvedValue({});
+
+      await callTool("fetch_alert_stats", {
+        alerts: ["alert-123"],
+        from: input,
+        to: input,
+        interval: "P1D",
+      });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        `/accounts/test-account/stats?alerts%5B%5D=alert-123&${new URLSearchParams({ from, to, interval: "P1D" })}`
+      );
+    });
+
+    it("should reject a date-time with an offset", async () => {
+      const result = await callTool("fetch_alert_stats", {
+        alerts: ["alert-123"],
+        ...range,
+        from: "2026-11-01T00:00:00+01:00",
+      });
+
+      expect(result).toEqual(errorResult(/Expected a date .* at from$/));
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+    });
+
+    it.each(["from", "to", "interval"])("should reject a call without %s", async (missing) => {
+      const result = await callTool("fetch_alert_stats", {
+        alerts: ["alert-123"],
+        ...range,
+        [missing]: undefined,
+      });
+
+      expect(result).toEqual(errorResult(new RegExp(`Required at ${missing}$`)));
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("pause_alert and unpause_alert", () => {
+    it.each([
+      { tool: "pause_alert", action: "pause", text: "Alert alert-123 paused." },
+      { tool: "unpause_alert", action: "unpause", text: "Alert alert-123 unpaused." },
+    ])("$tool should post to /$action and confirm", async ({ tool, action, text }) => {
+      mockApiClient.makeRequest.mockResolvedValue(null);
+
+      const result = await callTool(tool, { alert_id: "alert-123" });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+        `/accounts/test-account/alerts/alert-123/${action}`,
+        { method: "POST" }
+      );
+      expect(result).toEqual(textResult(text));
+    });
+  });
+
+  describe("alert_id path encoding", () => {
+    it.each([
+      { tool: "get_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
+      { tool: "update_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
+      { tool: "pause_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/pause" },
+      {
+        tool: "unpause_alert",
+        path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/unpause",
+      },
+      {
+        tool: "fetch_mentions",
+        path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/mentions",
+      },
+    ])("$tool should keep the alert_id in a single path segment", async ({ tool, path }) => {
+      mockApiClient.makeRequest.mockResolvedValue({});
+
+      await callTool(tool, { alert_id: "1/../x?y=#z" });
+
+      expect(mockApiClient.makeRequest).toHaveBeenCalledOnce();
+      expect(mockApiClient.makeRequest.mock.calls[0][0]).toBe(path);
+    });
+
+    it.each(["", ".", ".."])("should reject alert_id %j", async (alert_id) => {
+      const result = await callTool("pause_alert", { alert_id });
+
+      expect(result).toEqual(errorResult(`MCP error -32602: Invalid path segment: "${alert_id}"`));
+      expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("build-boolean-query prompt", () => {
+    it("should require instructions and include them in the message", async () => {
+      const { prompts } = await client.listPrompts();
+      const { messages } = await client.getPrompt({
+        name: "build-boolean-query",
+        arguments: { instructions: "Mentions about NASA in English" },
+      });
+
+      expect(prompts).toEqual([
+        expect.objectContaining({
+          name: "build-boolean-query",
+          arguments: [expect.objectContaining({ name: "instructions", required: true })],
+        }),
+      ]);
+      expect(messages).toEqual([
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: expect.stringContaining("Mentions about NASA in English"),
           },
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
-
-        const expectedUrl = `/accounts/test-account/stats?alerts%5B%5D=alert-456&alerts%5B%5D=alert-789&${rangeQuery}&timezone=Europe%2FBerlin&week_day_stats=true&influencers=true&tones%5B%5D=-1&tones%5B%5D=0&tones%5B%5D=1&languages%5B%5D=en&languages%5B%5D=fr&sources%5B%5D=twitter&sources%5B%5D=web&countries%5B%5D=US&countries%5B%5D=FR&country_stats=15`;
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
-      });
-
-      it("should handle boolean country_stats parameter", async () => {
-        const statsArgs = {
-          alerts: ["alert-123"],
-          ...range,
-          country_stats: true,
-        };
-
-        const mockResponse = {
-          stats: { "alert-123": { alert_id: "alert-123" } },
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}&country_stats=10`
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
-      });
-
-      it("should handle author influence score filter", async () => {
-        const statsArgs = {
-          alerts: ["alert-123"],
-          ...range,
-          "author_influence.score": "50:100",
-        };
-
-        const mockResponse = {
-          stats: { "alert-123": { alert_id: "alert-123" } },
-        };
-
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(mockResponse);
-
-        const result = await toolHandlers.handleTool("fetch_alert_stats", statsArgs);
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${rangeQuery}&author_influence.score=50%3A100`
-        );
-        expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
-      });
-
-      it.each([
-        ["2026-11-01", "2026-11-01T00:00:00.0", "2026-11-01T23:59:59.0"],
-        ["2026-11-01T00:00:00Z", "2026-11-01T00:00:00.0", "2026-11-01T00:00:00.0"],
-        ["2026-11-01T08:30:15.123Z", "2026-11-01T08:30:15.0", "2026-11-01T08:30:15.0"],
-      ])("should send %j as from %j and as to %j", async (input, from, to) => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
-
-        await toolHandlers.handleTool("fetch_alert_stats", {
-          alerts: ["alert-123"],
-          from: input,
-          to: input,
-          interval: "P1D",
-        });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          `/accounts/test-account/stats?alerts%5B%5D=alert-123&${new URLSearchParams({ from, to, interval: "P1D" })}`
-        );
-      });
-
-      it("should reject a date-time with an offset", async () => {
-        await expect(
-          toolHandlers.handleTool("fetch_alert_stats", {
-            alerts: ["alert-123"],
-            ...range,
-            from: "2026-11-01T00:00:00+01:00",
-          })
-        ).rejects.toMatchObject({ issues: [{ path: ["from"] }] });
-        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
-      });
-
-      it.each(["from", "to", "interval"])("should reject a call without %s", async (missing) => {
-        const args = { alerts: ["alert-123"], ...range, [missing]: undefined };
-
-        await expect(toolHandlers.handleTool("fetch_alert_stats", args)).rejects.toMatchObject({
-          issues: [{ path: [missing], code: "invalid_type" }],
-        });
-        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("handlePauseAlert and handleUnpauseAlert", () => {
-      it.each([
-        { tool: "pause_alert", action: "pause", text: "Alert alert-123 paused." },
-        { tool: "unpause_alert", action: "unpause", text: "Alert alert-123 unpaused." },
-      ])("$tool should post to /$action and confirm", async ({ tool, action, text }) => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(null);
-
-        const result = await toolHandlers.handleTool(tool, { alert_id: "alert-123" });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
-          `/accounts/test-account/alerts/alert-123/${action}`,
-          { method: "POST" }
-        );
-        expect(result.content[0].text).toBe(text);
-      });
-    });
-
-    describe("alert_id path encoding", () => {
-      it.each([
-        { tool: "get_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
-        { tool: "update_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
-        { tool: "pause_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/pause" },
-        {
-          tool: "unpause_alert",
-          path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/unpause",
         },
-        {
-          tool: "fetch_mentions",
-          path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/mentions",
-        },
-      ])("$tool should keep the alert_id in a single path segment", async ({ tool, path }) => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
-
-        await toolHandlers.handleTool(tool, { alert_id: "1/../x?y=#z" });
-
-        expect(mockApiClient.makeRequest).toHaveBeenCalledOnce();
-        expect((mockApiClient.makeRequest as MockedFunction<any>).mock.calls[0][0]).toBe(path);
-      });
-
-      it.each(["", ".", ".."])("should reject alert_id %j", async (alert_id) => {
-        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
-
-        await expect(toolHandlers.handleTool("pause_alert", { alert_id })).rejects.toThrow(
-          new McpError(ErrorCode.InvalidParams, `Invalid path segment: "${alert_id}"`)
-        );
-        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
-      });
+      ]);
     });
 
-    describe("handleTool", () => {
-      it("should throw error for unknown tool", async () => {
-        await expect(toolHandlers.handleTool("unknown_tool", {})).rejects.toThrow(
-          new McpError(ErrorCode.MethodNotFound, "Unknown tool: unknown_tool")
-        );
-      });
-
-      it("should handle validation errors", async () => {
-        await expect(toolHandlers.handleTool("create_basic_alert", { name: "" })).rejects.toThrow();
+    it("should reject a call without instructions as invalid params", async () => {
+      await expect(
+        client.getPrompt({ name: "build-boolean-query", arguments: {} })
+      ).rejects.toMatchObject({
+        code: ErrorCode.InvalidParams,
+        message: expect.stringMatching(/Required at instructions/),
       });
     });
   });
