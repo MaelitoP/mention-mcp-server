@@ -8,7 +8,8 @@ export function registerUpdateAlertTool(server: McpServer, apiClient: MentionAPI
     "update_alert",
     {
       title: "Update Alert",
-      description: "Update an existing alert with new criteria or settings.",
+      description:
+        "Update an existing alert with new criteria or settings. An alert's query type is fixed at creation: included_keywords, required_keywords and excluded_keywords apply only to basic alerts, and query_string only to advanced alerts. Sending a field of the other type rejects the whole update; to change the query type, create a new alert with create_basic_alert or create_advanced_alert.",
       inputSchema: UpdateAlertArgsSchema.shape,
       annotations: {
         readOnlyHint: false,
