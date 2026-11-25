@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `@modelcontextprotocol/sdk` upgraded from 1.12 to 1.32; the server now accepts MCP protocol version `2025-11-25`
+
 ## [1.4.1] - 2026-11-25
 
 ### Fixed
