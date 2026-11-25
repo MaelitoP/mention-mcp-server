@@ -2,28 +2,26 @@
   "name": "@maelitop/mention-mcp-server",
   "version": "1.4.0",
   "type": "module",
-  "main": "dist/index.js",
   "bin": {
     "mention-mcp-server": "dist/index.js"
   },
-  "files": ["dist/**/*"],
+  "files": ["dist/**/*", "CHANGELOG.md"],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
-    "check": "biome check .",
+    "check": "biome check . && tsc --noEmit",
     "check:fix": "biome check --write .",
-    "ci": "npm run check && npm run build && npm run test:run",
-    "version:patch": "npm version patch",
-    "version:minor": "npm version minor",
-    "version:major": "npm version major"
+    "ci": "npm run check && npm run build && npm run test:run"
   },
   "keywords": ["mcp", "mention", "monitoring", "api", "agorapulse"],
   "author": "MaelitoP",
@@ -45,7 +43,6 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.15.30",
-    "@vitest/ui": "^3.2.4",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
