@@ -67,6 +67,10 @@ describe("MCP server", () => {
     expect(capabilities).not.toHaveProperty("resources");
   });
 
+  it("should return server instructions at initialisation", () => {
+    expect(client.getInstructions()).toContain("Call get_account_info first.");
+  });
+
   describe("tools/list", () => {
     it("should list all tools", async () => {
       const { tools } = await client.listTools();
@@ -84,6 +88,31 @@ describe("MCP server", () => {
         "fetch_mentions",
         "fetch_alert_stats",
       ]);
+    });
+
+    it("should give every tool a title and annotations", async () => {
+      const { tools } = await client.listTools();
+      const read = { readOnlyHint: true, openWorldHint: true };
+      const write = (destructiveHint: boolean, idempotentHint: boolean) => ({
+        readOnlyHint: false,
+        destructiveHint,
+        idempotentHint,
+        openWorldHint: true,
+      });
+
+      expect(Object.fromEntries(tools.map((t) => [t.name, [t.title, t.annotations]]))).toEqual({
+        get_account_info: ["Get Account Info", read],
+        get_app_data: ["Get Languages, Countries and Sources", read],
+        list_alerts: ["List Alerts", read],
+        get_alert: ["Get Alert", read],
+        create_basic_alert: ["Create Basic Alert", write(false, false)],
+        create_advanced_alert: ["Create Advanced Alert", write(false, false)],
+        update_alert: ["Update Alert", write(true, true)],
+        pause_alert: ["Pause Alert", write(false, true)],
+        unpause_alert: ["Unpause Alert", write(false, true)],
+        fetch_mentions: ["Fetch Mentions", read],
+        fetch_alert_stats: ["Fetch Alert Stats", read],
+      });
     });
 
     it("should not expose a languages filter on fetch_mentions", async () => {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Every tool has a `title` and `annotations`: the read tools are marked `readOnlyHint`, `pause_alert` and `unpause_alert` `idempotentHint`, and `update_alert` `destructiveHint`, so clients no longer have to treat every tool as destructive
+- The server returns `instructions` at initialisation; the advice to call `get_account_info` first moved there from that tool's description, which now lists what the tool returns
+
 ### Changed
 - `@modelcontextprotocol/sdk` upgraded from 1.12 to 1.32; the server now accepts MCP protocol version `2025-11-25`
 - A failed tool call, such as a missing or invalid argument, an API error or an unknown tool name, returns a result with `isError: true` and a readable message instead of a JSON-RPC error, so the model can see what went wrong

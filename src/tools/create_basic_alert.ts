@@ -7,9 +7,16 @@ export function registerCreateBasicAlertTool(server: McpServer, apiClient: Menti
   server.registerTool(
     "create_basic_alert",
     {
+      title: "Create Basic Alert",
       description:
         "Create a new basic monitoring alert. Basic alerts use simple keyword matching with included_keywords, required_keywords, and excluded_keywords arrays.",
       inputSchema: CreateBasicAlertArgsSchema.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async ({
       included_keywords,

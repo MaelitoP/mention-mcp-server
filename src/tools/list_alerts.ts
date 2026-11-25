@@ -7,8 +7,10 @@ export function registerListAlertsTool(server: McpServer, apiClient: MentionAPIC
   server.registerTool(
     "list_alerts",
     {
+      title: "List Alerts",
       description: "List all monitoring alerts for the current account with pagination support.",
       inputSchema: ListAlertsArgsSchema.shape,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ limit, cursor }) => {
       const accountId = await apiClient.getAccountId();

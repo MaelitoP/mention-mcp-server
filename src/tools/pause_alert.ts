@@ -7,8 +7,15 @@ export function registerPauseAlertTool(server: McpServer, apiClient: MentionAPIC
   server.registerTool(
     "pause_alert",
     {
+      title: "Pause Alert",
       description: "Temporarily pause monitoring for a specific alert.",
       inputSchema: PauseAlertArgsSchema.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ alert_id }) => {
       const accountId = await apiClient.getAccountId();
