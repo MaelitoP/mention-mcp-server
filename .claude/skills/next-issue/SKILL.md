@@ -1,6 +1,6 @@
 ---
 name: next-issue
-description: Pick the next unblocked GitHub issue of this repository's roadmap, implement it as one commit and open a draft pull request. Use when asked to implement the next issue, continue the roadmap, or work on the next task. Pass an issue number to work on that issue instead.
+description: Pick the next unblocked GitHub issue of this repository's roadmap, implement it as one commit and merge it through a pull request once CI is green. Use when asked to implement the next issue, continue the roadmap, or work on the next task. Pass an issue number to work on that issue instead.
 ---
 
 # Implement the next roadmap issue
@@ -65,20 +65,32 @@ All three must pass. Then go through the acceptance list and confirm each item b
 
 If the `typescript-review` skill is available, run it on the diff before committing. Fix the findings that are real defects within the issue's scope and run the three commands again. List in the pull request body any finding you chose not to act on, with the reason. Skip this when the skill is not installed, and say so in the pull request body.
 
-## 5. Hand over
+## 5. Ship
 
 One commit. Its subject must follow Conventional Commits (https://www.conventionalcommits.org): `type(scope): summary`, with `!` before the colon for a breaking change. Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`. Issue titles are already written this way, so use the issue title exactly. The pull request title is the same string.
 
 The commit message is the subject line only: no body, no description, no trailers. The explanation belongs in the pull request.
 
-If you need a further commit on the branch (for example after review feedback), it follows the same format. Never commit with a subject such as "wip", "fixes" or "address review".
+If you need a further commit on the branch (for example after a CI failure), it follows the same format. Never commit with a subject such as "wip", "fixes" or "address review".
 
 ```bash
 git commit -m "<issue title>"
 git push
-gh pr create --draft --title "<issue title>" --body "<body>"
+gh pr create --title "<issue title>" --body "<body>"
 ```
 
-The pull request body states what changed, how each acceptance item was verified, anything left unverified, and ends with `Closes #<number>`.
+Every pushed branch gets a pull request; never leave one without. The body states what changed, how each acceptance item was verified, anything left unverified, and ends with `Closes #<number>`.
 
-Then stop and report the pull request URL. Never merge, tag, publish, or start a second issue in the same run unless asked.
+Then wait for CI and merge:
+
+```bash
+gh pr checks <pr> --watch --fail-fast
+gh pr merge <pr> --rebase --delete-branch
+```
+
+- Merge only when every check is green. Rebase-merge keeps the commit subjects on `main` as written, with no merge commit.
+- If a check fails, read the log, fix the cause within the issue's scope, push and wait again. Never merge red, skip a check or weaken a test to get green.
+- If you cannot get CI green, or anything on the acceptance list is unverified, leave the pull request open, say why in a comment on it and stop.
+- After merging, confirm the issue closed and the remote branch is gone.
+
+Report the merged pull request URL. Never tag or publish, and do not start a second issue in the same run unless asked.
