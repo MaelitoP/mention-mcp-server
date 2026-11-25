@@ -7,8 +7,15 @@ export function registerUnpauseAlertTool(server: McpServer, apiClient: MentionAP
   server.registerTool(
     "unpause_alert",
     {
+      title: "Unpause Alert",
       description: "Resume monitoring for a previously paused alert.",
       inputSchema: UnpauseAlertArgsSchema.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ alert_id }) => {
       const accountId = await apiClient.getAccountId();

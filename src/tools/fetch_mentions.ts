@@ -7,9 +7,11 @@ export function registerFetchMentionsTool(server: McpServer, apiClient: MentionA
   server.registerTool(
     "fetch_mentions",
     {
+      title: "Fetch Mentions",
       description:
         "Retrieve mentions associated with a specific alert. Supports various filters like source, folder, tone, countries, and advanced search queries.",
       inputSchema: FetchMentionsArgsSchema.shape,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ alert_id, ...queryParams }) => {
       const accountId = await apiClient.getAccountId();

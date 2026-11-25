@@ -7,8 +7,15 @@ export function registerUpdateAlertTool(server: McpServer, apiClient: MentionAPI
   server.registerTool(
     "update_alert",
     {
+      title: "Update Alert",
       description: "Update an existing alert with new criteria or settings.",
       inputSchema: UpdateAlertArgsSchema.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({
       alert_id,

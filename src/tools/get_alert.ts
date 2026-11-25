@@ -7,8 +7,10 @@ export function registerGetAlertTool(server: McpServer, apiClient: MentionAPICli
   server.registerTool(
     "get_alert",
     {
+      title: "Get Alert",
       description: "Get detailed information about a specific alert by its ID.",
       inputSchema: GetAlertArgsSchema.shape,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ alert_id }) => {
       const accountId = await apiClient.getAccountId();

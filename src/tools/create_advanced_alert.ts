@@ -7,9 +7,16 @@ export function registerCreateAdvancedAlertTool(server: McpServer, apiClient: Me
   server.registerTool(
     "create_advanced_alert",
     {
+      title: "Create Advanced Alert",
       description:
         "Create a new advanced monitoring alert with boolean query syntax. Advanced alerts use complex query strings with boolean operators like AND, OR, NOT.",
       inputSchema: CreateAdvancedAlertArgsSchema.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ query_string, ...requestData }) => {
       try {

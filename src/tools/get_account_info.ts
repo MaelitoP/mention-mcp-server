@@ -6,8 +6,10 @@ export function registerGetAccountInfoTool(server: McpServer, apiClient: Mention
   server.registerTool(
     "get_account_info",
     {
+      title: "Get Account Info",
       description:
-        "Get current account information including subscription plan, account ID, and capabilities. This tool should be called first to understand account limitations and determine which alert creation tools are available.",
+        "Get the current account's ID, its groups, and whether it can create advanced alerts (canCreateAdvancedAlert).",
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () => {
       const data = await apiClient.getAccountInfo();

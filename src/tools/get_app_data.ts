@@ -7,8 +7,10 @@ export function registerGetAppDataTool(server: McpServer, apiClient: MentionAPIC
   server.registerTool(
     "get_app_data",
     {
+      title: "Get Languages, Countries and Sources",
       description:
         "Get application configuration data including available languages, countries, sources, colors, and other metadata needed for creating alerts.",
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () => {
       const rawData = await apiClient.makeRequest("/app/data");

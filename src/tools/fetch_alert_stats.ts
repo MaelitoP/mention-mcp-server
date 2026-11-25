@@ -7,9 +7,11 @@ export function registerFetchAlertStatsTool(server: McpServer, apiClient: Mentio
   server.registerTool(
     "fetch_alert_stats",
     {
+      title: "Fetch Alert Stats",
       description:
         "Retrieve comprehensive statistics for one or more alerts including mentions per interval, tones, influencers, geographical data, and reach metrics. Supports flexible date ranges, filtering, and aggregation options.",
       inputSchema: FetchAlertStatsArgsSchema.shape,
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (args) => {
       const accountId = await apiClient.getAccountId();
