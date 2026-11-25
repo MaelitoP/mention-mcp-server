@@ -280,18 +280,22 @@ export const FetchAlertStatsArgsSchema = z.object({
     .min(1)
     .describe("One or more alert IDs to fetch statistics for (required)"),
   from: statsDateTime("00:00:00").describe(
-    "Start of the range, inclusive, as local time in the timezone parameter: a date (2026-11-01, read as 00:00:00) or a date-time (2026-11-01T08:00:00). Fractional seconds and a trailing Z are ignored."
+    "First day to include, in timezone, e.g. 2026-11-01. Any time of day, fractional seconds or trailing Z is ignored."
   ),
   to: statsDateTime("23:59:59").describe(
-    "End of the range, inclusive, as local time in the timezone parameter: a date (2026-11-30, read as 23:59:59) or a date-time (2026-11-30T18:00:00). Fractional seconds and a trailing Z are ignored."
+    "Last day to include, in timezone, e.g. 2026-11-30 to end on 30 November, not 2026-12-01. Any time of day, fractional seconds or trailing Z is ignored."
   ),
   timezone: z
     .string()
     .optional()
-    .describe("Timezone used for from/to dates (e.g., 'Europe/Berlin', 'UTC')"),
+    .describe(
+      "Timezone in which from and to are read and buckets start, e.g. 'Europe/Berlin'. Defaults to UTC."
+    ),
   interval: z
     .enum(["P1D", "P1W", "P1M"])
-    .describe("Aggregation interval: P1D (daily), P1W (weekly), P1M (monthly)"),
+    .describe(
+      "Bucket size: P1D (day), P1W (week, Monday to Sunday) or P1M (month). P1W and P1M widen the range to whole weeks or whole months."
+    ),
   favorite: z.boolean().optional().describe("Only include statistics based on favorite mentions"),
   tones: z
     .array(z.number().int().min(-1).max(1))
