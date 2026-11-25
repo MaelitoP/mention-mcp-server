@@ -51,6 +51,13 @@ describe("Tools", () => {
         expect(typeof tool.description).toBe("string");
       }
     });
+
+    it("should not expose a languages filter on fetch_mentions", () => {
+      const fetchMentions = getToolDefinitions().find((t) => t.name === "fetch_mentions");
+
+      expect(fetchMentions?.inputSchema).toHaveProperty("properties.tone");
+      expect(fetchMentions?.inputSchema).not.toHaveProperty("properties.languages");
+    });
   });
 
   describe("ToolHandlers", () => {
@@ -229,9 +236,8 @@ describe("Tools", () => {
           alert_id: "alert-456",
           limit: 50,
           source: "twitter",
-          tone: [1],
-          countries: ["US", "FR"],
-          languages: ["en", "fr"],
+          tone: [-1, 1],
+          countries: ["FR", "DE"],
           unread: true,
         };
 
@@ -246,7 +252,7 @@ describe("Tools", () => {
         const result = await toolHandlers.handleTool("fetch_mentions", mentionsArgs);
 
         const expectedUrl =
-          "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone=1&countries=US&countries=FR&languages=en&languages=fr";
+          "/accounts/test-account/alerts/alert-456/mentions?limit=50&source=twitter&unread=true&tone%5B%5D=-1&tone%5B%5D=1&countries%5B%5D=FR&countries%5B%5D=DE";
         expect(mockApiClient.makeRequest).toHaveBeenCalledWith(expectedUrl);
         expect(result.content[0].text).toBe(JSON.stringify(mockResponse, null, 2));
       });
