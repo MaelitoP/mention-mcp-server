@@ -11,11 +11,11 @@ vi.mock("../logger.js", () => ({
   logDebug: vi.fn(),
 }));
 
-async function connect(apiClient: MentionAPIClient) {
+async function connect(apiClient: MentionAPIClient, { readOnly = false } = {}) {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "1.0.0" });
   await Promise.all([
-    createServer(apiClient, "1.0.0").connect(serverTransport),
+    createServer(apiClient, "1.0.0", { readOnly }).connect(serverTransport),
     client.connect(clientTransport),
   ]);
   return client;
@@ -153,6 +153,37 @@ describe("MCP server", () => {
     });
   });
 
+  describe("read-only mode", () => {
+    async function connectReadOnly() {
+      const readOnlyClient = await connect(mockApiClient as unknown as MentionAPIClient, {
+        readOnly: true,
+      });
+      onTestFinished(() => readOnlyClient.close());
+      return readOnlyClient;
+    }
+
+    it("should list only the tools annotated readOnlyHint", async () => {
+      const readOnlyClient = await connectReadOnly();
+      const { tools: allTools } = await client.listTools();
+      const { tools } = await readOnlyClient.listTools();
+
+      expect(tools).toEqual(allTools.filter((t) => t.annotations?.readOnlyHint === true));
+    });
+
+    it("should not mention unregistered tools in the instructions", async () => {
+      const readOnlyClient = await connectReadOnly();
+      const { tools: allTools } = await client.listTools();
+      const { tools } = await readOnlyClient.listTools();
+      const registered = new Set(tools.map((t) => t.name));
+      const instructions = readOnlyClient.getInstructions();
+
+      expect(instructions).toContain("list_alerts");
+      for (const { name } of allTools.filter((t) => !registered.has(t.name))) {
+        expect(instructions).not.toContain(name);
+      }
+    });
+  });
+
   describe("tool errors", () => {
     it("should return a missing required argument as an error result", async () => {
       const result = await callTool("get_alert", {});
@@ -178,6 +209,7 @@ describe("MCP server", () => {
           apiBaseUrl: "https://api.test.com",
           logLevel: "info",
           requestTimeout: 5000,
+          readOnly: false,
         },
         "1.0.0"
       );

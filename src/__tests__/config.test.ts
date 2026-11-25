@@ -21,6 +21,7 @@ describe("Config", () => {
     expect(config.apiBaseUrl).toBe("https://web.mention.com/api");
     expect(config.logLevel).toBe("info");
     expect(config.requestTimeout).toBe(30000);
+    expect(config.readOnly).toBe(false);
   });
 
   it("should throw error when API key is missing", () => {
@@ -64,4 +65,24 @@ describe("Config", () => {
       );
     }
   );
+
+  it.each([
+    { readOnly: "", expected: false },
+    { readOnly: "false", expected: false },
+    { readOnly: "true", expected: true },
+  ])("should accept MENTION_READ_ONLY=$readOnly", ({ readOnly, expected }) => {
+    process.env.MENTION_API_KEY = "test-api-key";
+    process.env.MENTION_READ_ONLY = readOnly;
+
+    expect(loadConfig().readOnly).toBe(expected);
+  });
+
+  it.each(["1", "yes", "TRUE"])("should reject MENTION_READ_ONLY=%s", (readOnly) => {
+    process.env.MENTION_API_KEY = "test-api-key";
+    process.env.MENTION_READ_ONLY = readOnly;
+
+    expect(() => loadConfig()).toThrow(
+      `MENTION_READ_ONLY must be "true" or "false", got "${readOnly}"`
+    );
+  });
 });
