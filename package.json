@@ -1,6 +1,6 @@
 {
   "name": "@maelitop/mention-mcp-server",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "module",
   "bin": {
     "mention-mcp-server": "dist/index.js"
