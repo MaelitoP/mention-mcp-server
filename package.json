@@ -21,7 +21,8 @@
     "format": "biome format --write .",
     "check": "biome check . && tsc --noEmit",
     "check:fix": "biome check --write .",
-    "ci": "npm run check && npm run build && npm run test:run"
+    "ci": "npm run check && npm run build && npm run test:run",
+    "version": "biome format --write package.json"
   },
   "keywords": ["mcp", "mention", "monitoring", "api", "agorapulse"],
   "author": "MaelitoP",

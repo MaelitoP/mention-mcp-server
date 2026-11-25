@@ -81,6 +81,20 @@ npm test
 npm run test -- --watch
 ```
 
+## Releasing
+
+1. On an up-to-date `main`, move the `## [Unreleased]` entries of `CHANGELOG.md` under a heading for the new version and commit.
+2. Bump the version, commit it and create the `v<version>` tag:
+   ```bash
+   npm version patch -m "chore(release): %s"   # or minor, major
+   ```
+3. Push the commit and the tag:
+   ```bash
+   git push origin main --follow-tags
+   ```
+
+Pushing a `v*` tag runs the Publish workflow: it checks, builds and tests the package, publishes it to npm through trusted publishing (no npm token) and creates the GitHub release with generated notes.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
