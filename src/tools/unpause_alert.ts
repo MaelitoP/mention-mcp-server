@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { MentionAPIClient } from "../api-client.js";
+import { type MentionAPIClient, apiPath } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
 import { UnpauseAlertArgsSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
@@ -16,7 +16,7 @@ function createUnpauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
         const { alert_id } = UnpauseAlertArgsSchema.parse(args);
         const accountId = await apiClient.getAccountId();
 
-        await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}/unpause`, {
+        await apiClient.makeRequest(apiPath`/accounts/${accountId}/alerts/${alert_id}/unpause`, {
           method: "POST",
         });
 
