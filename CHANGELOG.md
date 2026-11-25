@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `fetch_mentions` sends `tone` and `countries` as `tone[]` and `countries[]`, so every tone value applies and a `countries` filter is no longer rejected
 - `pause_alert` and `unpause_alert` report success with a short confirmation instead of "Network request failed" when the API answers with an empty body
 - Requests send the server's real version in the `User-Agent` header, and `MCP_REQUEST_TIMEOUT` also bounds reading the response body
+- `update_alert` applies keyword and `query_string` changes without `query_type`: a keyword field sends a basic query, `query_string` an advanced one, and passing both is rejected
+- `update_alert` accepts any source code returned by `get_app_data` in `sources`
 
 ### Changed
 - `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MCP_CONSOLE_LOGGING` option and the platform-specific log files
 - `pino` and `pino-pretty` dependencies
 - `languages` parameter of `fetch_mentions`, which the endpoint did not apply
+- `query_type` parameter of `update_alert`, now inferred from the fields passed
+- `noise_detection` parameter of `create_basic_alert`, `create_advanced_alert` and `update_alert`, which the API does not accept
 
 ## [1.4.0] - 2025-06-29
 

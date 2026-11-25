@@ -16,7 +16,6 @@ function createUpdateAlertHandler(apiClient: MentionAPIClient): ToolHandler {
         const validated = UpdateAlertArgsSchema.parse(args);
         const {
           alert_id,
-          query_type,
           included_keywords,
           required_keywords,
           excluded_keywords,
@@ -28,20 +27,22 @@ function createUpdateAlertHandler(apiClient: MentionAPIClient): ToolHandler {
 
         const requestBody: Record<string, unknown> = { ...updateData };
 
-        if (query_type) {
-          if (query_type === "basic") {
-            requestBody.query = {
-              type: "basic",
-              included_keywords,
-              required_keywords,
-              excluded_keywords,
-            };
-          } else if (query_type === "advanced") {
-            requestBody.query = {
-              type: "advanced",
-              query_string,
-            };
-          }
+        if (query_string !== undefined) {
+          requestBody.query = {
+            type: "advanced",
+            query_string,
+          };
+        } else if (
+          included_keywords !== undefined ||
+          required_keywords !== undefined ||
+          excluded_keywords !== undefined
+        ) {
+          requestBody.query = {
+            type: "basic",
+            included_keywords,
+            required_keywords,
+            excluded_keywords,
+          };
         }
 
         const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}`, {
