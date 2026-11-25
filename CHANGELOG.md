@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - README documents `MENTION_API_KEY` and `MENTION_API_BASE_URL`, the variable names the server reads
+- Logs are written as JSON lines to stderr, so a startup failure such as a missing `MENTION_API_KEY` is reported before the process exits and stdout carries only MCP messages
+- The server no longer creates a log directory at startup, so a missing or read-only home directory does not crash it
+
+### Changed
+- `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup
+
+### Removed
+- `MCP_CONSOLE_LOGGING` option and the platform-specific log files
+- `pino` and `pino-pretty` dependencies
 
 ## [1.4.0] - 2025-06-29
 
