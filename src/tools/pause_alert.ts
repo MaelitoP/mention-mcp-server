@@ -16,12 +16,9 @@ function createPauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
         const { alert_id } = PauseAlertArgsSchema.parse(args);
         const accountId = await apiClient.getAccountId();
 
-        const data = await apiClient.makeRequest(
-          `/accounts/${accountId}/alerts/${alert_id}/pause`,
-          {
-            method: "POST",
-          }
-        );
+        await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}/pause`, {
+          method: "POST",
+        });
 
         logInfo("Alert paused", { accountId, alertId: alert_id });
 
@@ -29,7 +26,7 @@ function createPauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: `Alert ${alert_id} paused.`,
             },
           ],
         };

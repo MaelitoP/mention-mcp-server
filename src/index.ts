@@ -44,7 +44,7 @@ async function createServer() {
   }
 
   const version = getPackageVersion();
-  const apiClient = new MentionAPIClient(config);
+  const apiClient = new MentionAPIClient(config, version);
   const toolHandlers = new ToolHandlers(apiClient);
 
   const server = new Server(

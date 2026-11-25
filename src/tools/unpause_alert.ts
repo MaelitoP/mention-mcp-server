@@ -16,12 +16,9 @@ function createUnpauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
         const { alert_id } = UnpauseAlertArgsSchema.parse(args);
         const accountId = await apiClient.getAccountId();
 
-        const data = await apiClient.makeRequest(
-          `/accounts/${accountId}/alerts/${alert_id}/unpause`,
-          {
-            method: "POST",
-          }
-        );
+        await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}/unpause`, {
+          method: "POST",
+        });
 
         logInfo("Alert unpaused", { accountId, alertId: alert_id });
 
@@ -29,7 +26,7 @@ function createUnpauseAlertHandler(apiClient: MentionAPIClient): ToolHandler {
           content: [
             {
               type: "text",
-              text: JSON.stringify(data, null, 2),
+              text: `Alert ${alert_id} unpaused.`,
             },
           ],
         };

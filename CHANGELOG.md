@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Logs are written as JSON lines to stderr, so a startup failure such as a missing `MENTION_API_KEY` is reported before the process exits and stdout carries only MCP messages
 - The server no longer creates a log directory at startup, so a missing or read-only home directory does not crash it
 - `fetch_mentions` sends `tone` and `countries` as `tone[]` and `countries[]`, so every tone value applies and a `countries` filter is no longer rejected
+- `pause_alert` and `unpause_alert` report success with a short confirmation instead of "Network request failed" when the API answers with an empty body
+- Requests send the server's real version in the `User-Agent` header, and `MCP_REQUEST_TIMEOUT` also bounds reading the response body
 
 ### Changed
 - `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup

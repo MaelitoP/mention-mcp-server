@@ -1,5 +1,5 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { type MockedFunction, beforeEach, describe, expect, it, vi } from "vitest";
+import { type MockedFunction, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MentionAPIClient } from "../api-client.js";
 import type { Config } from "../config.js";
 
@@ -23,14 +23,17 @@ describe("MentionAPIClient", () => {
       requestTimeout: 5000,
       maxRetries: 3,
     };
-    client = new MentionAPIClient(config);
+    client = new MentionAPIClient(config, "1.2.3");
     mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("makeRequest", () => {
     it("should make successful API request", async () => {
-      const mockResponse = { ok: true, json: vi.fn().mockResolvedValue({ data: "test" }) };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(Response.json({ data: "test" }));
 
       const result = await client.makeRequest("/test");
 
@@ -40,22 +43,26 @@ describe("MentionAPIClient", () => {
           headers: expect.objectContaining({
             Authorization: "Bearer test-api-key",
             "Content-Type": "application/json",
-            "User-Agent": "mention-mcp-server/1.0.0",
+            "User-Agent": "mention-mcp-server/1.2.3",
           }),
         })
       );
       expect(result).toEqual({ data: "test" });
     });
 
+    it.each([
+      { label: "204", status: 204, body: null },
+      { label: "200 with an empty body", status: 200, body: "" },
+    ])("should resolve to null for a $label response", async ({ status, body }) => {
+      mockFetch.mockResolvedValue(new Response(body, { status }));
+
+      await expect(client.makeRequest("/test", { method: "POST" })).resolves.toBeNull();
+    });
+
     it("should handle 401 error properly", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 401,
-        json: vi.fn().mockResolvedValue({
-          error: { code: 401, message: "Unauthorized" },
-        }),
-      };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(
+        Response.json({ error: { code: 401, message: "Unauthorized" } }, { status: 401 })
+      );
 
       await expect(client.makeRequest("/test")).rejects.toThrow(
         new McpError(ErrorCode.InvalidRequest, "Invalid API key")
@@ -63,14 +70,9 @@ describe("MentionAPIClient", () => {
     });
 
     it("should handle 403 error properly", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 403,
-        json: vi.fn().mockResolvedValue({
-          error: { code: 403, message: "Forbidden" },
-        }),
-      };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(
+        Response.json({ error: { code: 403, message: "Forbidden" } }, { status: 403 })
+      );
 
       await expect(client.makeRequest("/test")).rejects.toThrow(
         new McpError(ErrorCode.InvalidRequest, "Access denied")
@@ -78,14 +80,9 @@ describe("MentionAPIClient", () => {
     });
 
     it("should handle 429 rate limit error properly", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 429,
-        json: vi.fn().mockResolvedValue({
-          error: { code: 429, message: "Rate limit exceeded" },
-        }),
-      };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(
+        Response.json({ error: { code: 429, message: "Rate limit exceeded" } }, { status: 429 })
+      );
 
       await expect(client.makeRequest("/test")).rejects.toThrow(
         new McpError(ErrorCode.InternalError, "Rate limit exceeded - please try again later")
@@ -100,12 +97,19 @@ describe("MentionAPIClient", () => {
       );
     });
 
-    it("should handle timeout", async () => {
-      const abortError = new Error("The operation was aborted");
-      abortError.name = "AbortError";
-      mockFetch.mockRejectedValue(abortError);
+    it("should time out when the response body stalls", { timeout: 1000 }, async () => {
+      const slowClient = new MentionAPIClient({ ...config, requestTimeout: 10 }, "1.2.3");
+      mockFetch.mockImplementation(async (_url, init) => {
+        const signal = init?.signal;
+        const body = new ReadableStream({
+          start(controller) {
+            signal?.addEventListener("abort", () => controller.error(signal.reason));
+          },
+        });
+        return new Response(body);
+      });
 
-      await expect(client.makeRequest("/test")).rejects.toThrow(
+      await expect(slowClient.makeRequest("/test")).rejects.toThrow(
         new McpError(ErrorCode.InternalError, "Request timeout")
       );
     });
@@ -121,8 +125,7 @@ describe("MentionAPIClient", () => {
         },
       };
 
-      const mockResponse = { ok: true, json: vi.fn().mockResolvedValue(mockAccountData) };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(Response.json(mockAccountData));
 
       const result1 = await client.getAccountInfo();
       expect(result1).toEqual(mockAccountData);
@@ -134,6 +137,7 @@ describe("MentionAPIClient", () => {
     });
 
     it("should refresh cache after expiry", async () => {
+      vi.useFakeTimers();
       const mockAccountData = {
         account: {
           id: "test-account",
@@ -141,14 +145,14 @@ describe("MentionAPIClient", () => {
         },
       };
 
-      const mockResponse = { ok: true, json: vi.fn().mockResolvedValue(mockAccountData) };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockImplementation(async () => Response.json(mockAccountData));
 
+      await client.getAccountInfo();
+      vi.advanceTimersByTime(5 * 60 * 1000 - 1);
       await client.getAccountInfo();
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      client.clearAccountCache();
-
+      vi.advanceTimersByTime(1);
       await client.getAccountInfo();
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
@@ -163,8 +167,7 @@ describe("MentionAPIClient", () => {
         },
       };
 
-      const mockResponse = { ok: true, json: vi.fn().mockResolvedValue(mockAccountData) };
-      mockFetch.mockResolvedValue(mockResponse as any);
+      mockFetch.mockResolvedValue(Response.json(mockAccountData));
 
       const accountId = await client.getAccountId();
       expect(accountId).toBe("test-account-id");
