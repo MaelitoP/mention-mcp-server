@@ -20,7 +20,6 @@ describe("Config", () => {
     expect(config.apiKey).toBe("test-api-key");
     expect(config.apiBaseUrl).toBe("https://web.mention.com/api");
     expect(config.logLevel).toBe("info");
-    expect(config.enableConsoleLogging).toBe(false);
     expect(config.requestTimeout).toBe(30000);
     expect(config.maxRetries).toBe(3);
   });
@@ -35,7 +34,6 @@ describe("Config", () => {
     process.env.MENTION_API_KEY = "test-api-key";
     process.env.MENTION_API_BASE_URL = "https://custom.api.com";
     process.env.MCP_LOG_LEVEL = "debug";
-    process.env.MCP_CONSOLE_LOGGING = "true";
     process.env.MCP_REQUEST_TIMEOUT = "60000";
     process.env.MCP_MAX_RETRIES = "5";
 
@@ -43,7 +41,6 @@ describe("Config", () => {
 
     expect(config.apiBaseUrl).toBe("https://custom.api.com");
     expect(config.logLevel).toBe("debug");
-    expect(config.enableConsoleLogging).toBe(true);
     expect(config.requestTimeout).toBe(60000);
     expect(config.maxRetries).toBe(5);
   });

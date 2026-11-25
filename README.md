@@ -49,7 +49,6 @@ Add the following to your Claude Desktop configuration file:
 | `MENTION_API_KEY` | Your Mention API key (required) | - |
 | `MENTION_API_BASE_URL` | Custom API base URL | `https://web.mention.com/api` |
 | `MCP_LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
-| `MCP_CONSOLE_LOGGING` | Enable console logging (`true`/`false`) | `false` |
 | `MCP_REQUEST_TIMEOUT` | Request timeout in milliseconds | `30000` |
 | `MCP_MAX_RETRIES` | Maximum retry attempts | `3` |
 
@@ -72,14 +71,6 @@ npm run build
 # Run linting, build and tests
 npm run ci
 ```
-
-## Logging
-
-Logs are automatically written to platform-specific directories:
-
-- **macOS**: `~/Library/Logs/mention-mcp-server/mention-mcp-server.log`
-- **Windows**: `~/AppData/Local/mention-mcp-server/logs/mention-mcp-server.log`
-- **Linux**: `~/.local/share/mention-mcp-server/logs/mention-mcp-server.log`
 
 ## Testing
 

@@ -20,7 +20,6 @@ describe("MentionAPIClient", () => {
       apiKey: "test-api-key",
       apiBaseUrl: "https://api.test.com",
       logLevel: "info",
-      enableConsoleLogging: false,
       requestTimeout: 5000,
       maxRetries: 3,
     };
