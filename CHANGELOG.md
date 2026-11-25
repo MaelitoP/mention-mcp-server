@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A 403 keeps the reason the API gives, such as a plan without access to a feature, after "Access denied" instead of dropping it
 - A 400 or other API error whose body carries a message shows that message and the HTTP status instead of the raw response body: form errors become one `field: message` line each, and an invalid Boolean query in `create_advanced_alert` lists each error with its line and column, one per line, instead of generic tips and an example query. A 401 and a 429 keep their fixed messages
 - `fetch_alert_stats` describes `from` and `to` as calendar days in `timezone`, both included, whose time of day and trailing `Z` are ignored; `interval` says that `P1W` and `P1M` widen the range to whole weeks (Monday to Sunday) or months, and `timezone` that it defaults to UTC
+- `update_alert` states that an alert's query type cannot change: the keyword fields apply only to basic alerts and `query_string` only to advanced ones, and a field of the other type rejects the whole update. It also states that a keyword list left out is kept and that an empty `required_keywords` clears it
 
 ## [1.4.1] - 2026-11-25
 

@@ -159,20 +159,26 @@ export const UpdateAlertArgsSchema = z.object({
   included_keywords: z
     .array(z.string())
     .optional()
-    .describe("Keywords to include (for basic queries)"),
+    .describe(
+      "Keywords to include. Basic alerts only. Replaces the alert's list; leave out to keep it."
+    ),
   required_keywords: z
     .array(z.string())
     .optional()
-    .describe("Required keywords (for basic queries)"),
+    .describe(
+      "Required keywords. Basic alerts only. Replaces the alert's list; leave out to keep it, or send an empty list to clear it."
+    ),
   excluded_keywords: z
     .array(z.string())
     .optional()
-    .describe("Excluded keywords (for basic queries)"),
+    .describe(
+      "Excluded keywords. Basic alerts only. Replaces the alert's list; leave out to keep it."
+    ),
   query_string: z
     .string()
     .optional()
     .describe(
-      "Advanced query string (for advanced queries). Cannot be combined with included_keywords, required_keywords or excluded_keywords."
+      "Advanced query string. Advanced alerts only. Cannot be combined with included_keywords, required_keywords or excluded_keywords."
     ),
   languages: z.array(z.string()).max(5).optional().describe("Language codes to monitor (max 5)"),
   countries: z.array(z.string()).optional().describe("Country codes to monitor"),
