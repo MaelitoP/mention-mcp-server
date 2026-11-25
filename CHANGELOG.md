@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup
+- The package requires Node.js 22 or later (`engines.node`)
+- The published package contains only the compiled server, README, LICENSE and CHANGELOG; tests, type declarations and source maps are no longer shipped
 
 ### Removed
 - `MCP_CONSOLE_LOGGING` option and the platform-specific log files
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `query_type` parameter of `update_alert`, now inferred from the fields passed
 - `noise_detection` parameter of `create_basic_alert`, `create_advanced_alert` and `update_alert`, which the API does not accept
 - Retry-count environment variable and its config field; the server parsed it but never retried requests
+- `main` field of `package.json`; the package is a command-line server with no importable API
 
 ## [1.4.0] - 2025-06-29
 
