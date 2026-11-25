@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `MCP_REQUEST_TIMEOUT` that is not a whole number of milliseconds between 1 and 2147483647 stops the server at startup with an error naming the variable, instead of making requests fail; a value with a unit suffix such as `60000ms` is now rejected rather than truncated
 - Requests send `Accept-Version: 1.21`, so every user gets the same API behaviour whatever version their API application was created with; alerts returned by `get_alert`, `list_alerts` and `update_alert` now have an empty `stats` field
 - `get_alert`, `update_alert`, `pause_alert`, `unpause_alert` and `fetch_mentions` URL-encode `alert_id` and reject an empty, `.` or `..` value, so an `alert_id` can no longer send the request to another endpoint
+- `fetch_alert_stats` requires `from`, `to` and `interval`, since the API returns 400 without them, and sends `from` and `to` in the `2026-11-01T00:00:00.0` form the API accepts: each takes a date (`from` starts at 00:00:00, `to` ends at 23:59:59) or a date-time read in `timezone`, whose fractional seconds and trailing `Z` are ignored
 
 ### Changed
 - `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `noise_detection` parameter of `create_basic_alert`, `create_advanced_alert` and `update_alert`, which the API does not accept
 - Retry-count environment variable and its config field; the server parsed it but never retried requests
 - `main` field of `package.json`; the package is a command-line server with no importable API
+- `important` parameter of `fetch_alert_stats`, which the API does not accept
 
 ## [1.4.0] - 2025-06-29
 

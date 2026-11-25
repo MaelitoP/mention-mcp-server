@@ -276,23 +276,36 @@ export const FetchMentionsArgsSchema = z.object({
   cursor: z.string().optional().describe("Pagination cursor for navigating results"),
 });
 
+// The stats endpoint rejects a Z, an offset, or a date-time without fractional seconds.
+function statsDateTime(timeIfDateOnly: "00:00:00" | "23:59:59") {
+  return z
+    .string()
+    .regex(
+      /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/,
+      "Expected a date (2026-11-01) or a date-time (2026-11-01T08:00:00), optionally ending in Z"
+    )
+    .transform((value) => `${value.slice(0, 10)}T${value.slice(11, 19) || timeIfDateOnly}.0`);
+}
+
 export const FetchAlertStatsArgsSchema = z.object({
   alerts: z
     .array(z.string())
     .min(1)
     .describe("One or more alert IDs to fetch statistics for (required)"),
-  from: z.string().optional().describe("Start date for statistics (ISO8601 format, inclusive)"),
-  to: z.string().optional().describe("End date for statistics (ISO8601 format, inclusive)"),
+  from: statsDateTime("00:00:00").describe(
+    "Start of the range, inclusive, as local time in the timezone parameter: a date (2026-11-01, read as 00:00:00) or a date-time (2026-11-01T08:00:00). Fractional seconds and a trailing Z are ignored."
+  ),
+  to: statsDateTime("23:59:59").describe(
+    "End of the range, inclusive, as local time in the timezone parameter: a date (2026-11-30, read as 23:59:59) or a date-time (2026-11-30T18:00:00). Fractional seconds and a trailing Z are ignored."
+  ),
   timezone: z
     .string()
     .optional()
     .describe("Timezone used for from/to dates (e.g., 'Europe/Berlin', 'UTC')"),
   interval: z
     .enum(["P1D", "P1W", "P1M"])
-    .optional()
     .describe("Aggregation interval: P1D (daily), P1W (weekly), P1M (monthly)"),
   favorite: z.boolean().optional().describe("Only include statistics based on favorite mentions"),
-  important: z.boolean().optional().describe("Only include statistics based on important mentions"),
   tones: z
     .array(z.number().int().min(-1).max(1))
     .optional()
