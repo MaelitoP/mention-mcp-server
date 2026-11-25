@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `@modelcontextprotocol/sdk` upgraded from 1.12 to 1.32; the server now accepts MCP protocol version `2025-11-25`
+- A failed tool call, such as a missing or invalid argument, an API error or an unknown tool name, returns a result with `isError: true` and a readable message instead of a JSON-RPC error, so the model can see what went wrong
+- An unknown prompt name or invalid `build-boolean-query` arguments return an "Invalid params" error naming the problem instead of an internal error
+
+### Removed
+- `resources` capability, which listed no resources
+- `zod-to-json-schema` dependency
+- Log lines for each tool call (started, completed, failed); failed API requests are still logged
 
 ## [1.4.1] - 2026-11-25
 

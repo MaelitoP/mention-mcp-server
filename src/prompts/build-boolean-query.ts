@@ -1,38 +1,21 @@
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { type BuildBooleanQueryPromptArgs, BuildBooleanQueryPromptArgsSchema } from "../types.js";
-import type { Prompt, PromptDefinition, PromptHandler } from "./base.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { BuildBooleanQueryPromptArgsSchema } from "../types.js";
 
-export const buildBooleanQueryPrompt: Prompt = {
-  getDefinition(): PromptDefinition {
-    return {
-      name: "build-boolean-query",
+export function registerBuildBooleanQueryPrompt(server: McpServer) {
+  server.registerPrompt(
+    "build-boolean-query",
+    {
       description:
         "Generate a valid Boolean query string using Boolean operators, quoted terms, proximity, and field selectors",
-      arguments: [
+      argsSchema: BuildBooleanQueryPromptArgsSchema.shape,
+    },
+    ({ instructions }) => ({
+      messages: [
         {
-          name: "instructions",
-          description:
-            "What the Boolean query should match, e.g., 'Mentions about NASA in English from the US or Canada'",
-          required: true,
-        },
-      ],
-    };
-  },
-
-  createHandler(): PromptHandler {
-    return {
-      async handle(args: unknown) {
-        const parsedArgs = BuildBooleanQueryPromptArgsSchema.parse(
-          args
-        ) as BuildBooleanQueryPromptArgs;
-
-        return {
-          messages: [
-            {
-              role: "user",
-              content: {
-                type: "text",
-                text: `You are generating a valid Boolean query string using the following rules:
+          role: "user",
+          content: {
+            type: "text",
+            text: `You are generating a valid Boolean query string using the following rules:
                   1. Combine clauses using AND, OR, and NOT. Wrap mixed clauses in parentheses.
                   2. A clause can be:
                      - A term: single word (e.g. NASA)
@@ -59,13 +42,11 @@ export const buildBooleanQueryPrompt: Prompt = {
                      - Stop words alone not allowed in OR
                      - Max term length: 128 chars
                   Generate a Boolean query for the following:
-                  ${parsedArgs.instructions}
+                  ${instructions}
                 `,
-              },
-            },
-          ],
-        };
-      },
-    };
-  },
-};
+          },
+        },
+      ],
+    })
+  );
+}
