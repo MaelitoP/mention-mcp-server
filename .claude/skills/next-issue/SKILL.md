@@ -89,6 +89,7 @@ gh pr merge <pr> --rebase --delete-branch
 ```
 
 - Merge only when every check is green. Rebase-merge keeps the commit subjects on `main` as written, with no merge commit.
+- Right after a push, `gh pr checks` can still show the previous commit's run. Before merging, confirm the green run belongs to the head commit: `gh run list --commit "$(git rev-parse HEAD)"` must list a completed, successful run.
 - If a check fails, read the log, fix the cause within the issue's scope, push and wait again. Never merge red, skip a check or weaken a test to get green.
 - If you cannot get CI green, or anything on the acceptance list is unverified, leave the pull request open, say why in a comment on it and stop.
 - After merging, confirm the issue closed and the remote branch is gone.
