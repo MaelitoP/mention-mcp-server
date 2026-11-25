@@ -30,6 +30,7 @@ export class MentionAPIClient {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
           "User-Agent": this.userAgent,
+          "Accept-Version": "1.21",
           ...options.headers,
         },
       });
