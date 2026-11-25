@@ -6,12 +6,14 @@ import { AccountResponseSchema } from "./types.js";
 
 export class MentionAPIClient {
   private config: Config;
+  private readonly userAgent: string;
   private accountCache: AccountResponse | null = null;
   private accountCacheExpiry = 0;
   private readonly accountCacheTTL = 5 * 60 * 1000; // 5 minutes
 
-  constructor(config: Config) {
+  constructor(config: Config, serverVersion: string) {
     this.config = config;
+    this.userAgent = `mention-mcp-server/${serverVersion}`;
   }
 
   async makeRequest(endpoint: string, options: RequestInit = {}): Promise<unknown> {
@@ -20,22 +22,17 @@ export class MentionAPIClient {
 
     logDebug("Making API request", { requestId, endpoint, method: options.method || "GET" });
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.config.requestTimeout);
-
     try {
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal,
+        signal: AbortSignal.timeout(this.config.requestTimeout),
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
-          "User-Agent": "mention-mcp-server/1.0.0",
+          "User-Agent": this.userAgent,
           ...options.headers,
         },
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         let rawErrorData: unknown;
@@ -92,17 +89,16 @@ export class MentionAPIClient {
         throw new McpError(ErrorCode.InternalError, errorMsg);
       }
 
-      const responseData = await response.json();
+      const responseText = await response.text();
+      const responseData = responseText ? JSON.parse(responseText) : null;
       logDebug("API request successful", { requestId, endpoint });
       return responseData;
     } catch (error) {
-      clearTimeout(timeoutId);
-
       if (error instanceof McpError) {
         throw error;
       }
 
-      if (error instanceof Error && error.name === "AbortError") {
+      if (error instanceof Error && error.name === "TimeoutError") {
         const errorMsg = "Request timeout";
         logError(errorMsg, error, { requestId, endpoint, timeout: this.config.requestTimeout });
         throw new McpError(ErrorCode.InternalError, errorMsg);
@@ -140,11 +136,5 @@ export class MentionAPIClient {
   async getAccountId(): Promise<string> {
     const accountInfo = await this.getAccountInfo();
     return accountInfo.account.id;
-  }
-
-  clearAccountCache(): void {
-    this.accountCache = null;
-    this.accountCacheExpiry = 0;
-    logDebug("Account cache cleared");
   }
 }

@@ -393,6 +393,24 @@ describe("Tools", () => {
       });
     });
 
+    describe("handlePauseAlert and handleUnpauseAlert", () => {
+      it.each([
+        { tool: "pause_alert", action: "pause", text: "Alert alert-123 paused." },
+        { tool: "unpause_alert", action: "unpause", text: "Alert alert-123 unpaused." },
+      ])("$tool should post to /$action and confirm", async ({ tool, action, text }) => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue(null);
+
+        const result = await toolHandlers.handleTool(tool, { alert_id: "alert-123" });
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledWith(
+          `/accounts/test-account/alerts/alert-123/${action}`,
+          { method: "POST" }
+        );
+        expect(result.content[0].text).toBe(text);
+      });
+    });
+
     describe("handleTool", () => {
       it("should throw error for unknown tool", async () => {
         await expect(toolHandlers.handleTool("unknown_tool", {})).rejects.toThrow(
