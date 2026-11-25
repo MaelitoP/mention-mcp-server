@@ -44,6 +44,8 @@ Read the whole issue. Its Problem, Change and Acceptance sections are the scope;
 
 If the issue turns out to be wrong, already done, or impossible without a decision, do not improvise. Comment on the issue with what you found, remove yourself as assignee, delete the remote branch and stop.
 
+When a TypeScript design question comes up (API shape, type modelling, error strategy, module layout), ask the `typescript-expert` skill if it is available, rather than guessing. Skip this when the skill is not installed.
+
 House rules:
 
 - The smallest change that satisfies the acceptance list. No new dependency unless the issue names it.
@@ -60,6 +62,8 @@ npm run check && npm run build && npx vitest run
 ```
 
 All three must pass. Then go through the acceptance list and confirm each item by running or reading the result, not by assumption.
+
+If the `typescript-review` skill is available, run it on the diff before committing. Fix the findings that are real defects within the issue's scope and run the three commands again. List in the pull request body any finding you chose not to act on, with the reason. Skip this when the skill is not installed, and say so in the pull request body.
 
 ## 5. Hand over
 
