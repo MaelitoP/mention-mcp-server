@@ -462,6 +462,39 @@ describe("Tools", () => {
       });
     });
 
+    describe("alert_id path encoding", () => {
+      it.each([
+        { tool: "get_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
+        { tool: "update_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z" },
+        { tool: "pause_alert", path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/pause" },
+        {
+          tool: "unpause_alert",
+          path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/unpause",
+        },
+        {
+          tool: "fetch_mentions",
+          path: "/accounts/test-account/alerts/1%2F..%2Fx%3Fy%3D%23z/mentions",
+        },
+      ])("$tool should keep the alert_id in a single path segment", async ({ tool, path }) => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+        (mockApiClient.makeRequest as MockedFunction<any>).mockResolvedValue({});
+
+        await toolHandlers.handleTool(tool, { alert_id: "1/../x?y=#z" });
+
+        expect(mockApiClient.makeRequest).toHaveBeenCalledOnce();
+        expect((mockApiClient.makeRequest as MockedFunction<any>).mock.calls[0][0]).toBe(path);
+      });
+
+      it.each(["", ".", ".."])("should reject alert_id %j", async (alert_id) => {
+        (mockApiClient.getAccountId as MockedFunction<any>).mockResolvedValue("test-account");
+
+        await expect(toolHandlers.handleTool("pause_alert", { alert_id })).rejects.toThrow(
+          new McpError(ErrorCode.InvalidParams, `Invalid path segment: "${alert_id}"`)
+        );
+        expect(mockApiClient.makeRequest).not.toHaveBeenCalled();
+      });
+    });
+
     describe("handleTool", () => {
       it("should throw error for unknown tool", async () => {
         await expect(toolHandlers.handleTool("unknown_tool", {})).rejects.toThrow(

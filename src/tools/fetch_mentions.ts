@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { MentionAPIClient } from "../api-client.js";
+import { type MentionAPIClient, apiPath } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
 import { FetchMentionsArgsSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
@@ -33,7 +33,8 @@ function createFetchMentionsHandler(apiClient: MentionAPIClient): ToolHandler {
         }
 
         const queryString = searchParams.toString();
-        const endpoint = `/accounts/${accountId}/alerts/${alert_id}/mentions${queryString ? `?${queryString}` : ""}`;
+        const path = apiPath`/accounts/${accountId}/alerts/${alert_id}/mentions`;
+        const endpoint = queryString ? `${path}?${queryString}` : path;
 
         const data = await apiClient.makeRequest(endpoint);
 

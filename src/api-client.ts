@@ -4,6 +4,15 @@ import { logDebug, logError } from "./logger.js";
 import type { AccountResponse, MentionAPIError } from "./types.js";
 import { AccountResponseSchema } from "./types.js";
 
+export function apiPath(strings: TemplateStringsArray, ...segments: string[]): string {
+  for (const segment of segments) {
+    if (segment === "" || segment === "." || segment === "..") {
+      throw new McpError(ErrorCode.InvalidParams, `Invalid path segment: "${segment}"`);
+    }
+  }
+  return String.raw({ raw: strings }, ...segments.map(encodeURIComponent));
+}
+
 export class MentionAPIClient {
   private config: Config;
   private readonly userAgent: string;

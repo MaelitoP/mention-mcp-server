@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { MentionAPIClient } from "../api-client.js";
+import { type MentionAPIClient, apiPath } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
 import { GetAlertArgsSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
@@ -16,7 +16,9 @@ function createGetAlertHandler(apiClient: MentionAPIClient): ToolHandler {
         const { alert_id } = GetAlertArgsSchema.parse(args);
         const accountId = await apiClient.getAccountId();
 
-        const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}`);
+        const data = await apiClient.makeRequest(
+          apiPath`/accounts/${accountId}/alerts/${alert_id}`
+        );
 
         logInfo("Alert retrieved", { accountId, alertId: alert_id });
 

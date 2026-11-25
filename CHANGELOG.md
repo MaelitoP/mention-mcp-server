@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `update_alert` accepts any source code returned by `get_app_data` in `sources`
 - An `MCP_REQUEST_TIMEOUT` that is not a whole number of milliseconds between 1 and 2147483647 stops the server at startup with an error naming the variable, instead of making requests fail; a value with a unit suffix such as `60000ms` is now rejected rather than truncated
 - Requests send `Accept-Version: 1.21`, so every user gets the same API behaviour whatever version their API application was created with; alerts returned by `get_alert`, `list_alerts` and `update_alert` now have an empty `stats` field
+- `get_alert`, `update_alert`, `pause_alert`, `unpause_alert` and `fetch_mentions` URL-encode `alert_id` and reject an empty, `.` or `..` value, so an `alert_id` can no longer send the request to another endpoint
 
 ### Changed
 - `MCP_LOG_LEVEL` accepts `debug`, `info`, `warn` and `error`; any other value falls back to `info` instead of crashing at startup

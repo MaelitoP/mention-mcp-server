@@ -1,5 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import type { MentionAPIClient } from "../api-client.js";
+import { type MentionAPIClient, apiPath } from "../api-client.js";
 import { logError, logInfo } from "../logger.js";
 import { UpdateAlertArgsSchema } from "../types.js";
 import type { Tool, ToolDefinition, ToolHandler } from "./base.js";
@@ -45,10 +45,13 @@ function createUpdateAlertHandler(apiClient: MentionAPIClient): ToolHandler {
           };
         }
 
-        const data = await apiClient.makeRequest(`/accounts/${accountId}/alerts/${alert_id}`, {
-          method: "PUT",
-          body: JSON.stringify(requestBody),
-        });
+        const data = await apiClient.makeRequest(
+          apiPath`/accounts/${accountId}/alerts/${alert_id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(requestBody),
+          }
+        );
 
         logInfo("Alert updated", { accountId, alertId: alert_id });
 
