@@ -24,7 +24,7 @@ function createFetchMentionsHandler(apiClient: MentionAPIClient): ToolHandler {
           if (value !== undefined && value !== null) {
             if (Array.isArray(value)) {
               for (const item of value) {
-                searchParams.append(key, String(item));
+                searchParams.append(`${key}[]`, String(item));
               }
             } else {
               searchParams.append(key, String(value));
@@ -65,7 +65,7 @@ export const fetchMentionsTool: Tool = {
     return {
       name: "fetch_mentions",
       description:
-        "Retrieve mentions associated with a specific alert. Supports various filters like source, folder, tone, countries, languages, and advanced search queries.",
+        "Retrieve mentions associated with a specific alert. Supports various filters like source, folder, tone, countries, and advanced search queries.",
       inputSchema: zodToJsonSchema(FetchMentionsArgsSchema),
     };
   },

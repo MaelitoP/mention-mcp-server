@@ -257,10 +257,6 @@ export const FetchMentionsArgsSchema = z.object({
     ])
     .optional()
     .describe("Sort by field"),
-  languages: z
-    .array(z.string())
-    .optional()
-    .describe("Filter by language codes. Multiple values allowed."),
   timezone: z.string().optional().describe("Timezone for parsing date values in q parameter"),
   q: z.string().optional().describe("Advanced keyword-based filtering"),
   cursor: z.string().optional().describe("Pagination cursor for navigating results"),
